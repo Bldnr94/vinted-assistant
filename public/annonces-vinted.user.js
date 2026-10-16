@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Annonces → Vinted
 // @namespace    https://github.com/Bldnr94/vinted-assistant
-// @version      1.0.4
+// @version      1.0.5
 // @description  Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.
 // @match        https://www.vinted.fr/*
 // @grant        GM.xmlHttpRequest
@@ -149,12 +149,22 @@
     if (!el || isForbidden(el)) throw new Error("refused to click a publish, save or link element");
     el.scrollIntoView({ block: "center" });
     const r = el.getBoundingClientRect();
-    const opts = { bubbles: true, cancelable: true, view: window, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
-    el.dispatchEvent(new PointerEvent("pointerdown", { ...opts, pointerType: "touch", isPrimary: true }));
-    el.dispatchEvent(new MouseEvent("mousedown", opts));
-    el.dispatchEvent(new PointerEvent("pointerup", { ...opts, pointerType: "touch", isPrimary: true }));
-    el.dispatchEvent(new MouseEvent("mouseup", opts));
-    el.dispatchEvent(new MouseEvent("click", opts));
+    // No "view" member: in Tampermonkey on Firefox, the script's window is a sandbox wrapper that
+    // the event constructors reject.
+    const opts = { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+    const fire = (make) => {
+      try {
+        el.dispatchEvent(make());
+      } catch {
+        // A browser without PointerEvent: the mouse events below still do the job.
+      }
+    };
+    fire(() => new PointerEvent("pointerdown", { ...opts, pointerType: "touch", isPrimary: true }));
+    fire(() => new MouseEvent("mousedown", opts));
+    fire(() => new PointerEvent("pointerup", { ...opts, pointerType: "touch", isPrimary: true }));
+    fire(() => new MouseEvent("mouseup", opts));
+    if (typeof el.click === "function") el.click();
+    else fire(() => new MouseEvent("click", opts));
   }
 
   // Sets an input's value so React notices it.
