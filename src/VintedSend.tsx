@@ -74,9 +74,9 @@ export function VintedSend({ item }: { item: Item }) {
             </a>
           </div>
           <p className="hint">
-            In vinted.fr, tap <strong>Fill the form</strong> in the Annonces panel and allow Paste. If the Vinted app
-            opens instead, open {SELL_URL.replace("https://", "")} in your browser yourself; the link stays copied for one
-            hour.
+            In vinted.fr, tap <strong>Fill the form</strong> in the Annonces panel and allow Paste. If this opens the
+            Vinted app or a browser without the script (on Android, anything but Firefox), open{" "}
+            {SELL_URL.replace("https://", "")} in Safari or Firefox yourself; the link stays copied for one hour.
           </p>
         </>
       )}
