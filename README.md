@@ -25,7 +25,7 @@ publish yourself.
    edges for about 0.018 USD a photo. Label and defect close-ups are never changed. If the cutout's colours differ from your
    photo, the app keeps the original unless you choose otherwise.
 5. **On model** (optional): the garment goes on your own AI model (FASHN Try-On Max), one
-   photo per saved pose, about 0.08 USD each. You create the model once in
+   photo per saved pose, about 0.23 USD each. You create the model once in
    Settings → AI model, in up to 3 poses, so every listing shows the same body and room (no face, casual phone-photo look).
    AI photos start unticked; tick only those whose colour, print and fit match the real item.
    Ticked ones go after every real photo, and the description gets a line saying they are
@@ -73,9 +73,9 @@ Only if you switch Studio cutout to fal.ai in Settings.
    the same way. The presets ask for a casual phone photo at home, framed from the chin down so
    no face appears. Or use a chin-down photo of yourself instead, for free.
 
-Costs per item: 1 credit per pose (Try-On Max, 1k, fast), so about 0.08 USD with one pose.
-For sharper results add the variable `TRYON_QUALITY` = `quality` in Cloudflare (2k balanced,
-3 credits, about 0.23 USD a pose). Creating the model is free with your own photo. Photos are sent inline and results come back inline: FASHN deletes the inputs after
+Costs per item: 3 credits per pose (Try-On Max, 2k, balanced), about 0.23 USD a pose.
+To cut that to about 0.075 USD, add the variable `TRYON_QUALITY` = `fast` in Cloudflare
+(1k, 1 credit). Creating the model is free with your own photo. Photos are sent inline and results come back inline: FASHN deletes the inputs after
 processing and keeps the outputs for one hour; it keeps a record of each request (no images).
 FASHN does not train on your images.
 

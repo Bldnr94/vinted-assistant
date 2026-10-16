@@ -122,7 +122,7 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
             <button className="primary" disabled={busy || !garment} onClick={generate}>
               {busy
                 ? "Generating… keep this screen open"
-                : `Generate ${poses.length} ${poses.length === 1 ? "photo" : "photos"} (≈ ${(poses.length * 0.075).toFixed(2)} USD)`}
+                : `Generate ${poses.length} ${poses.length === 1 ? "photo" : "photos"} (≈ ${(poses.length * 0.23).toFixed(2)} USD)`}
             </button>
             <button className="link" onClick={onSetup}>
               Edit model
