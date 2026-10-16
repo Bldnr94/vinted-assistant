@@ -108,3 +108,24 @@ export interface DraftResponse {
 
 export const MAX_PHOTOS = 20; // Vinted's limit per listing
 export const MAX_PHOTOS_TO_CLAUDE = 10; // keeps the draft call around 0.10 USD
+
+// Package the phone sends to /api/handoff so the vinted.fr form-filling script can fetch it.
+export interface HandoffListing {
+  title: string;
+  description: string; // already includes the AI-illustration notice when needed
+  price: number;
+  brand: string;
+  size: string;
+  condition: string;
+  colours: string[];
+  materials: string;
+  category_path: string;
+}
+
+export interface HandoffPackage {
+  listing: HandoffListing;
+  photos: string[]; // base64 JPEGs in listing order
+}
+
+export const AI_NOTICE =
+  "Les photos portées sont des illustrations générées par IA. Les autres photos montrent l'article réel.";
