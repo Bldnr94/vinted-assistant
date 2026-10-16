@@ -10,6 +10,8 @@ import {
   type ShotKind,
 } from "../shared/listing";
 import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
+import { listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { VintedSend } from "./VintedSend";
 import { listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
 import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
@@ -473,6 +475,8 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         </button>
         <h1>List it</h1>
       </header>
+      <VintedSend item={item} />
+      <h2 className="or">Or by hand</h2>
       <ol className="steps">
         <li>
           <button className="primary" onClick={savePhotos}>

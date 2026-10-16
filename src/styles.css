@@ -93,3 +93,6 @@ th { width: 34%; color: var(--muted); font-weight: 500; }
 .choice .warn { margin: 0; }
 label.inline { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 500; }
 label.inline input { width: auto; margin: 0; }
+.vinted-send { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+.vinted-send p:first-child { margin-top: 0; }
+h2.or { font-size: 15px; color: var(--muted); margin: 20px 0 8px; }
