@@ -11,6 +11,7 @@ import {
 } from "../shared/listing";
 import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
 import { listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
 
 export type Screen = { name: "home" } | { name: "settings" } | { name: "capture" | "review" | "studio" | "handoff"; id: string };
@@ -132,12 +133,14 @@ function Home({ go }: { go: Go }) {
 
 function Settings({ go }: { go: Go }) {
   const [token, setToken] = useState(readToken);
+  const [engine, setEngine] = useState(readEngine);
   const save = () => {
     try {
       localStorage.setItem(TOKEN_KEY, token.trim());
     } catch {
       alert("This browser blocked local storage, so the token could not be saved.");
     }
+    saveEngine(engine);
     go({ name: "home" });
   };
   return (
@@ -153,6 +156,17 @@ function Settings({ go }: { go: Go }) {
         <input value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
       </label>
       <p className="hint">The same value as APP_TOKEN in Cloudflare. It stays on this phone.</p>
+      <label>
+        Studio cutout
+        <select value={engine} onChange={(e) => setEngine(e.target.value as CutoutEngine)}>
+          <option value="phone">On this phone (free)</option>
+          <option value="fal">fal.ai (cleaner edges, about 0.018 USD a photo)</option>
+        </select>
+      </label>
+      <p className="hint">
+        On this phone, the photo never leaves it; the first use downloads an 88 MB model, so use Wi-Fi. fal.ai needs
+        FAL_KEY in Cloudflare.
+      </p>
       <button className="primary" onClick={save}>
         Save
       </button>
