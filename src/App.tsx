@@ -16,12 +16,13 @@ import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
 import { ModelPhotos } from "./ModelPhotos";
 import { ModelSetup } from "./ModelSetup";
+import { Replies, ReplySettingsFields } from "./Replies";
 
 export type Screen =
   | { name: "home" }
   | { name: "settings" }
   | { name: "model"; back: Screen }
-  | { name: "capture" | "review" | "studio" | "worn" | "handoff"; id: string };
+  | { name: "capture" | "review" | "studio" | "worn" | "handoff" | "replies"; id: string };
 
 const TOKEN_KEY = "app-token";
 export function readToken(): string {
@@ -44,6 +45,7 @@ export default function App() {
       {screen.name === "worn" && <ModelPhotos id={screen.id} go={setScreen} />}
       {screen.name === "model" && <ModelSetup onBack={() => setScreen(screen.back)} />}
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
+      {screen.name === "replies" && <Replies id={screen.id} go={setScreen} />}
     </main>
   );
 }
@@ -182,6 +184,7 @@ function Settings({ go }: { go: Go }) {
         </button>
         <button onClick={() => go({ name: "model", back: { name: "settings" } })}>AI model</button>
       </div>
+      <ReplySettingsFields />
     </>
   );
 }
@@ -410,12 +413,13 @@ function Review({ id, go }: { id: string; go: Go }) {
         <button className="primary" onClick={() => go({ name: "studio", id })}>
           Next: photos
         </button>
+        <button onClick={() => go({ name: "replies", id })}>Buyer replies</button>
       </div>
     </>
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+export function CopyButton({ text, label }: { text: string; label: string }) {
   const [done, setDone] = useState(false);
   const copy = async () => {
     try {
@@ -524,6 +528,7 @@ function Handoff({ id, go }: { id: string; go: Go }) {
             >
               Mark as listed
             </button>
+            <button onClick={() => go({ name: "replies", id })}>Buyer replies</button>
             <button
               className="danger"
               onClick={async () => {
