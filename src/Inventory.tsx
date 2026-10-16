@@ -364,6 +364,7 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
         {item.status === "sold" && <button onClick={() => setStatus("live")}>Not sold after all</button>}
         {item.status === "live" && <button onClick={() => setStatus("draft")}>Back to draft</button>}
         {d && <button onClick={() => go({ name: "review", id })}>Edit listing</button>}
+        {d && <button onClick={() => go({ name: "replies", id })}>Buyer replies</button>}
         <button
           className="danger"
           onClick={async () => {
