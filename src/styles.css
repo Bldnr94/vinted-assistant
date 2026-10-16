@@ -96,3 +96,7 @@ label.inline input { width: auto; margin: 0; }
 .vinted-send { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
 .vinted-send p:first-child { margin-top: 0; }
 h2.or { font-size: 15px; color: var(--muted); margin: 20px 0 8px; }
+.items li { display: flex; gap: 8px; align-items: center; }
+.items li .item { flex: 1; min-width: 0; }
+.retry { white-space: nowrap; margin-bottom: 8px; }
+.item small.error { color: var(--error); }

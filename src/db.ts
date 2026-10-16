@@ -24,6 +24,8 @@ export interface Item {
   draftModel?: string;
   draftTokens?: { input_tokens: number; output_tokens: number };
   listedPrice?: number;
+  draftState?: "queued" | "drafting" | "failed"; // batch mode's background drafting queue
+  draftError?: string;
 }
 
 export interface ModelPose {
