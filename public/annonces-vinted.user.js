@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Annonces → Vinted
 // @namespace    https://github.com/Bldnr94/vinted-assistant
-// @version      1.0.0
+// @version      1.0.1
 // @description  Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.
 // @match        https://www.vinted.fr/*
 // @grant        GM.xmlHttpRequest
@@ -11,6 +11,8 @@
 // @connect      pages.dev
 // @connect      *
 // @run-at       document-idle
+// @updateURL    https://raw.githubusercontent.com/Bldnr94/vinted-assistant/main/public/annonces-vinted.user.js
+// @downloadURL  https://raw.githubusercontent.com/Bldnr94/vinted-assistant/main/public/annonces-vinted.user.js
 // @noframes
 // ==/UserScript==
 

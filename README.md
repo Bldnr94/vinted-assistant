@@ -127,17 +127,19 @@ the by-hand steps, which keep working.
    **Set Userscripts Directory**, pick any folder (for example On My iPhone → Userscripts).
 2. **Settings → Apps → Safari → Extensions → Userscripts**: turn it on, and under
    permissions allow **www.vinted.fr** and **vinted-assistant.pages.dev** (or All Websites).
-3. In Safari open `https://vinted-assistant.pages.dev/annonces-vinted.user.js` (sign in to
-   Access if asked). Tap the **aA** (or puzzle) icon in the address bar → **Userscripts** →
-   **Tap to install** → **Install**.
+3. In Safari open `https://raw.githubusercontent.com/Bldnr94/vinted-assistant/main/public/annonces-vinted.user.js`.
+   Tap the **aA** (or puzzle) icon in the address bar → **Userscripts** → **Tap to install**
+   → **Install**.
 
 **b. Android (Firefox; Chrome on Android has no extensions).**
 
 1. Install **Firefox** from the Play Store. Menu → **Add-ons** → **Tampermonkey** → **Add**.
-2. In Firefox open `https://vinted-assistant.pages.dev/annonces-vinted.user.js` and tap
-   **Install** on Tampermonkey's page.
-3. On the first fill, Tampermonkey asks whether the script may reach
-   `vinted-assistant.pages.dev`: choose **Always allow domain**.
+2. Menu → **Extensions** → **Tampermonkey** → **Dashboard** → **Utilities** → **Import from
+   URL**, paste `https://raw.githubusercontent.com/Bldnr94/vinted-assistant/main/public/annonces-vinted.user.js`
+   and tap **Install**. (Opening that address directly may not bring up the install page on
+   Android.)
+3. On the first fill, Tampermonkey asks whether the script may reach your app's address
+   (for example `vinted-assistant-a3j.pages.dev`): choose **Always allow domain**.
 
 **c. Each listing.**
 
@@ -153,8 +155,9 @@ the by-hand steps, which keep working.
 
 **If a field stops filling:** Vinted changed its page. Tap **Form report** in the panel and
 paste the copied text into the project thread; the field rules at the top of
-`public/annonces-vinted.user.js` get fixed from it. After an update, open the script's
-address again to reinstall it.
+`public/annonces-vinted.user.js` get fixed from it. Tampermonkey and Userscripts pick up
+fixes from the GitHub address on their own; to get one straight away, use **Check for
+updates** in Tampermonkey or reinstall from the same address.
 
 ## Testing the MVP
 
