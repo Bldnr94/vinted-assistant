@@ -1,18 +1,21 @@
 // POST /api/tryon — puts the garment on one of your saved model photos (FASHN Try-On Max).
 // Keeps the model's identity, pose and backdrop, so every listing shows the same person.
 
-import { checkRequest, isBase64Image, json, readJson, runFashn } from "../../shared/server";
+import { checkRequest, isBase64Image, json, readJson, runFashn, seedOf } from "../../shared/server";
 
 interface Env {
   APP_TOKEN: string;
   FASHN_API_KEY: string;
+  // Default: 2k balanced, 3 credits (~0.23 USD) a photo.
+  // "fast": 1k, 1 credit (~0.075 USD) a photo.
+  TRYON_QUALITY?: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const denied = checkRequest(request, env as unknown as Record<string, unknown>, ["FASHN_API_KEY"]);
   if (denied) return denied;
 
-  const body = await readJson<{ product?: unknown; product_type?: unknown; model?: unknown; prompt?: unknown }>(request);
+  const body = await readJson<{ product?: unknown; product_type?: unknown; model?: unknown; prompt?: unknown; seed?: unknown }>(request);
   if (!isBase64Image(body?.product) || !isBase64Image(body?.model)) {
     return json({ error: "Send product and model as base64 images." }, 400);
   }
@@ -23,8 +26,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       product_image: `data:image/${productType};base64,${body.product}`,
       model_image: `data:image/jpeg;base64,${body.model}`,
       prompt: typeof body.prompt === "string" ? body.prompt.slice(0, 300) : "",
-      resolution: "2k",
-      generation_mode: "balanced",
+      ...(env.TRYON_QUALITY === "fast"
+        ? { resolution: "1k", generation_mode: "fast" }
+        : { resolution: "2k", generation_mode: "balanced" }),
+      output_format: "jpeg",
+      seed: seedOf(body.seed),
+      return_base64: true,
     });
     return json({ image });
   } catch (e) {

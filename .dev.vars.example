@@ -2,3 +2,4 @@ ANTHROPIC_API_KEY=sk-ant-...
 APP_TOKEN=choose-a-long-random-string
 # MODEL=claude-sonnet-5-5
 FAL_KEY=your-fal-key
+FASHN_API_KEY=your-fashn-key

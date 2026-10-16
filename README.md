@@ -19,14 +19,24 @@ publish yourself.
    take and a rule-of-thumb price. Guessed fields are highlighted.
 3. **Review**: edit everything. "Compare on vinted.fr" opens a search for similar items.
 4. **Studio**: front, back and detail shots can go on a clean light-grey studio background
-   with a soft shadow, cropped around the garment. The garment is cut out (Bria RMBG 2.0 on
-   fal.ai, about 0.018 USD a photo) and copied pixel for pixel, so colours and defects stay as
-   shot. Label and defect close-ups are never changed. If the cutout's colours differ from your
+   with a soft shadow, cropped around the garment. The garment is cut out and copied pixel for
+   pixel, so colours and defects stay as shot. By default the cutout runs on your phone, free
+   (IS-Net through `@imgly/background-removal`; the 88 MB model downloads once, from this app,
+   on first use). In Settings you can switch to Bria RMBG 2.0 on fal.ai, which gives cleaner
+   edges for about 0.018 USD a photo. Label and defect close-ups are never changed. If the cutout's colours differ from your
    photo, the app keeps the original unless you choose otherwise.
 5. **List it**: either **Send to vinted.fr**, which fills vinted.fr's sell form for you (see
    "Fill on vinted.fr" below), or by hand: save the photos in listing order, open Vinted, copy
    the title and description, tap the listed values into the form. Either way you press
    publish in Vinted.
+5. **On model** (optional): the garment goes on your own AI model (FASHN Try-On Max), one
+   photo per saved pose, about 0.23 USD each. You create the model once in
+   Settings → AI model, in up to 3 poses, so every listing shows the same body and room (no face, casual phone-photo look).
+   AI photos start unticked; tick only those whose colour, print and fit match the real item.
+   Ticked ones go after every real photo, and the description gets a line saying they are
+   AI-generated illustrations.
+6. **List it**: save the photos in listing order, open Vinted, copy the title and
+   description, tap the listed values into the form, press publish in Vinted.
 
 ## Setup (about 30 minutes, once)
 
@@ -50,10 +60,29 @@ You need: a GitHub account (this repo), an Anthropic API account, a free Cloudfl
    - Optional `MODEL`: `claude-sonnet-5-5` to halve the cost; default is `claude-opus-5-5`.
 4. Deploy. You get a URL like `https://vinted-assistant.pages.dev`.
 
-### 2b. fal.ai key (Studio photos)
+### 2b. fal.ai key (optional, Studio photos)
 
-1. Sign up at https://fal.ai, add credit (5 USD lasts about 250 photos), and create an API key.
+Only if you switch Studio cutout to fal.ai in Settings.
+
+1. Sign up at https://fal.ai, add credit (the 10 USD minimum lasts about 550 photos), and create an API key.
 2. In Cloudflare Pages, add it as the secret `FAL_KEY`, then redeploy.
+
+### 2c. FASHN key (AI model photos, optional)
+
+1. Sign up at https://app.fashn.ai, open **Developer API**, buy credits (about 0.075 USD each,
+   minimum top-up around 7.50 USD) and create an API key.
+2. In Cloudflare Pages, **Settings → Variables and Secrets**, add it for Production as the
+   **Secret** `FASHN_API_KEY`, then redeploy (Deployments → ⋯ → Retry deployment).
+3. On the phone: **Settings → AI model**, pick Woman or Man (or edit the description), tap
+   **Create 2 options** (about 0.45 USD) and **Use this** on the one you like. Add a second pose
+   the same way. The presets ask for a casual phone photo at home, framed from the chin down so
+   no face appears. Or use a chin-down photo of yourself instead, for free.
+
+Costs per item: 3 credits per pose (Try-On Max, 2k, balanced), about 0.23 USD a pose.
+To cut that to about 0.075 USD, add the variable `TRYON_QUALITY` = `fast` in Cloudflare
+(1k, 1 credit). Creating the model is free with your own photo. Photos are sent inline and results come back inline: FASHN deletes the inputs after
+processing and keeps the outputs for one hour; it keeps a record of each request (no images).
+FASHN does not train on your images.
 
 ### 3. Lock it to you (recommended)
 
@@ -151,10 +180,15 @@ npm run preview                  # builds and serves app + /api/draft on http://
 
 ## Layout
 
-- `src/`: the React PWA (screens in `App.tsx`, IndexedDB in `db.ts`, photo resize in `photos.ts`).
+- `src/`: the React PWA (screens in `App.tsx`, IndexedDB in `db.ts`, photo resize in `photos.ts`,
+  garment cutout in `cutout.ts`).
+- `scripts/cutout-assets.mjs`: runs after the build and copies the on-phone cutout model and
+  runtime into `dist/cutout/`. The library and model data are AGPL-3.0, fine for this private app.
 - `functions/api/draft.ts`: the Cloudflare Pages Function that calls Claude.
 - `functions/api/handoff/`: stores one listing for an hour for the vinted.fr script.
 - `public/annonces-vinted.user.js`: the vinted.fr form-filling userscript.
 - `src/VintedSend.tsx`: the **Send to vinted.fr** step on the List it screen.
+- `src/ModelSetup.tsx` + `functions/api/model.ts`: create your AI model (FASHN Model Create).
+- `src/ModelPhotos.tsx` + `functions/api/tryon.ts`: put an item on it (FASHN Try-On Max).
 - `shared/listing.ts`: Vinted vocabulary (conditions, colours), shot list, draft schema.
   Correct the colour list or conditions here if vinted.fr's form differs.

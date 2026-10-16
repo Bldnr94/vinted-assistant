@@ -3,21 +3,19 @@
 import { useState } from "react";
 import type { Photo } from "./db";
 import { Thumb, readToken, useItem, type Go } from "./App";
-import { IMPROVABLE, composeStudio, dataUriToBlob, toBase64 } from "./photos";
+import { cutout, readEngine } from "./cutout";
+import { IMPROVABLE, composeStudio } from "./photos";
 
 // Average channel difference (0-255) above which the cutout no longer matches the photo.
 const MAX_COLOUR_SHIFT = 6;
-const COST_PER_PHOTO_USD = 0.018;
+const FAL_COST_PER_PHOTO_USD = 0.018;
 
-async function improve(photo: Photo): Promise<Pick<Photo, "improved" | "colourShift" | "useImproved">> {
-  const res = await fetch("/api/enhance", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-app-token": readToken() },
-    body: JSON.stringify({ image: await toBase64(photo.blob) }),
-  });
-  const body = await res.json().catch(() => ({ error: `Server answered ${res.status}` }));
-  if (!res.ok) throw new Error(body.error || `Server answered ${res.status}`);
-  const { jpeg, colourShift } = await composeStudio(photo.blob, await dataUriToBlob(body.cutout));
+async function improve(
+  photo: Photo,
+  onProgress: (message: string) => void,
+): Promise<Pick<Photo, "improved" | "colourShift" | "useImproved">> {
+  const cut = await cutout(photo.blob, readEngine(), readToken(), onProgress);
+  const { jpeg, colourShift } = await composeStudio(photo.blob, cut);
   return { improved: jpeg, colourShift, useImproved: colourShift <= MAX_COLOUR_SHIFT };
 }
 
@@ -30,6 +28,9 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const improvable = item.photos.filter((p) => IMPROVABLE.includes(p.kind as never));
   const kept = item.photos.filter((p) => p.kind !== "ai_model" && !IMPROVABLE.includes(p.kind as never));
   const todo = improvable.filter((p) => !p.improved);
+  const engine = readEngine();
+  const price =
+    engine === "fal" ? `about ${(todo.length * FAL_COST_PER_PHOTO_USD).toFixed(2)} USD` : "free, on this phone";
 
   const setPhoto = (photoId: string, patch: Partial<Photo>) =>
     update((cur) => ({ ...cur, photos: cur.photos.map((p) => (p.id === photoId ? { ...p, ...patch } : p)) }));
@@ -37,9 +38,10 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const run = async (photos: Photo[]) => {
     setError("");
     for (const [i, p] of photos.entries()) {
-      setBusy(`Improving ${i + 1} of ${photos.length}…`);
+      const step = `Improving ${i + 1} of ${photos.length}…`;
+      setBusy(step);
       try {
-        await setPhoto(p.id, await improve(p));
+        await setPhoto(p.id, await improve(p, (message) => setBusy(`${step} ${message}`)));
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         break;
@@ -62,7 +64,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
       </p>
       {todo.length > 0 && (
         <button className="primary" disabled={!!busy} onClick={() => run(todo)}>
-          {busy || `Improve ${todo.length} ${todo.length === 1 ? "photo" : "photos"} (about ${(todo.length * COST_PER_PHOTO_USD).toFixed(2)} USD)`}
+          {busy || `Improve ${todo.length} ${todo.length === 1 ? "photo" : "photos"} (${price})`}
         </button>
       )}
       {busy && todo.length === 0 && <p className="hint">{busy}</p>}
@@ -117,8 +119,8 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         </>
       )}
       <div className="actions">
-        <button className="primary" disabled={!!busy} onClick={() => go({ name: "handoff", id })}>
-          Ready to list
+        <button className="primary" disabled={!!busy} onClick={() => go({ name: "worn", id })}>
+          Next: on model
         </button>
       </div>
     </>

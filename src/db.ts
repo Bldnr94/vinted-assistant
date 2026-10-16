@@ -30,6 +30,7 @@ export interface ModelPose {
   id: string;
   blob: Blob; // JPEG of your AI model, reused for every try-on
   createdAt: number;
+  prompt?: string; // what made it; empty for an uploaded photo
 }
 
 const DB_NAME = "vinted-assistant";
