@@ -11,6 +11,7 @@ import {
 } from "../shared/listing";
 import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
 import { listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { VintedSend } from "./VintedSend";
 import { Studio } from "./Studio";
 
 export type Screen = { name: "home" } | { name: "settings" } | { name: "capture" | "review" | "studio" | "handoff"; id: string };
@@ -448,6 +449,8 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         </button>
         <h1>List it</h1>
       </header>
+      <VintedSend item={item} />
+      <h2 className="or">Or by hand</h2>
       <ol className="steps">
         <li>
           <button className="primary" onClick={savePhotos}>
