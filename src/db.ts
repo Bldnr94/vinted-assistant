@@ -40,6 +40,8 @@ export interface Item {
   snoozedUntil?: number; // no price-drop reminder before this time
   soldAt?: number;
   soldPrice?: number;
+  draftState?: "queued" | "drafting" | "failed"; // batch mode's background drafting queue
+  draftError?: string;
 }
 
 // One row per sale, kept when the item and its photos are deleted, to feed price suggestions later.

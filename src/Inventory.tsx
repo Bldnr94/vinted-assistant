@@ -3,6 +3,7 @@
 // changes Vinted.
 import { useEffect, useState } from "react";
 import { Thumb, useItem, type Go } from "./App";
+import { draftLabel, enqueue, useQueueVersion } from "./batch";
 import { deleteItem, deleteSale, listItems, saveItem, saveSale, type Item, type ItemStatus } from "./db";
 import { orderedPhotos } from "./photos";
 import {
@@ -73,16 +74,17 @@ function readFilter(): ItemStatus | "all" {
 function subtitle(it: Item): string {
   if (it.status === "sold") return `Sold ${euros(it.soldPrice)}${it.soldAt ? ` · ${dateFr(it.soldAt)}` : ""}`;
   if (it.status === "live") return `Live ${euros(it.listedPrice)} · ${daysSince(it.listedAt ?? it.updatedAt)} d`;
-  return `${it.draft ? "Draft ready" : "Photos"} · ${it.photos.length} photos`;
+  return `${draftLabel(it)} · ${it.photos.length} photos`;
 }
 
 export function Inventory({ go }: { go: Go }) {
   const [items, setItems] = useState<Item[]>();
   const [filter, setFilter] = useState(readFilter);
   const reload = () => listItems().then(setItems);
+  const queue = useQueueVersion(); // batch drafts finishing in the background
   useEffect(() => {
     reload();
-  }, []);
+  }, [queue]);
   const pick = (f: ItemStatus | "all") => {
     setFilter(f);
     try {
@@ -128,8 +130,14 @@ export function Inventory({ go }: { go: Go }) {
               <span>
                 <strong>{it.draft?.title || "Untitled item"}</strong>
                 <small>{subtitle(it)}</small>
+                {it.draftState === "failed" && <small className="error">{it.draftError}</small>}
               </span>
             </button>
+            {it.draftState === "failed" && (
+              <button className="retry" onClick={() => enqueue(it.id)}>
+                Retry draft
+              </button>
+            )}
           </li>
         ))}
       </ul>
