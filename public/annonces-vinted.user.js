@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Annonces → Vinted
 // @namespace    https://github.com/Bldnr94/vinted-assistant
-// @version      1.0.2
+// @version      1.0.3
 // @description  Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.
 // @match        https://www.vinted.fr/*
 // @grant        GM.xmlHttpRequest
@@ -134,6 +134,9 @@
       if (href && href !== "#" && !href.startsWith("javascript:")) return true;
     }
     if (button && FORBIDDEN_TEXT.test(button.textContent || button.value || "")) return true;
+    // vinted.fr's publish button is a plain type="button" reading just "Ajouter".
+    if (el.closest('[data-testid^="upload-form-save"]')) return true;
+    if (button && /^ajouter$/i.test(norm(button.textContent))) return true;
     return false;
   }
 
@@ -302,7 +305,8 @@
   async function fillChoice(field, wanted, { search = false, multi = false } = {}) {
     const wants = (Array.isArray(wanted) ? wanted : [wanted]).filter(Boolean);
     if (!wants.length) return "empty in the app";
-    const input = await waitFor(() => find(field), 2500);
+    // Brand, size, condition, colour and material appear only after a category is picked.
+    const input = await waitFor(() => find(field), 6000);
     if (!input) return field === "material" || field === "size" ? "not in this category's form" : "field not found";
     const w = await openDropdown(input);
     const done = [];
@@ -469,13 +473,20 @@
   function formReport() {
     // The whole page except the site header, its search bar and this panel; the sell form
     // is not necessarily the first <form> on the page.
-    const skip = (el) => insidePanel(el) || insideChrome(el) || /^search/.test(el.dataset?.testid || "");
+    const skip = (el) =>
+      insidePanel(el) ||
+      insideChrome(el) ||
+      /^search/.test(el.dataset?.testid || "") ||
+      el.matches("script, style") ||
+      !!el.closest('#onetrust-consent-sdk, [id^="onetrust"], [id^="ot-"]');
     const rows = [];
     const seen = new Set();
     document.body
-      .querySelectorAll('input, textarea, select, button, label, h1, h2, h3, [data-testid], [role="button"], [role="combobox"]')
+      .querySelectorAll(
+        'input, textarea, select, button, label, h1, h2, h3, li, [data-testid], [role="button"], [role="combobox"], [role="option"], [role="listbox"]',
+      )
       .forEach((el) => {
-        if (skip(el) || rows.length > 300) return;
+        if (skip(el) || rows.length > 400) return;
         const tag = el.tagName.toLowerCase();
         const label = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
         const row = [
@@ -569,7 +580,11 @@
     ui.list = shadow.querySelector("ul");
     ui.report = shadow.querySelector(".report");
     ui.fill.onclick = run;
-    shadow.querySelector(".rep").onclick = formReport;
+    // Waits 5 seconds, so you can open a dropdown before the page is read.
+    shadow.querySelector(".rep").onclick = () => {
+      log("Reading the page in 5 seconds. Open a dropdown now if you want it included.");
+      setTimeout(formReport, 5000);
+    };
     shadow.querySelector(".toggle").onclick = (e) => {
       box.classList.toggle("min");
       e.target.textContent = box.classList.contains("min") ? "+" : "–";
