@@ -26,7 +26,7 @@ publish yourself.
    photo, the app keeps the original unless you choose otherwise.
 5. **On model** (optional): the garment goes on your own AI model (FASHN Try-On Max), one
    photo per saved pose, about 0.23 USD each. You create the model once in
-   Settings → AI model, in up to 3 poses, so every listing shows the same person and backdrop.
+   Settings → AI model, in up to 3 poses, so every listing shows the same body and room (no face, casual phone-photo look).
    AI photos start unticked; tick only those whose colour, print and fit match the real item.
    Ticked ones go after every real photo, and the description gets a line saying they are
    AI-generated illustrations.
@@ -70,8 +70,8 @@ Only if you switch Studio cutout to fal.ai in Settings.
    **Secret** `FASHN_API_KEY`, then redeploy (Deployments → ⋯ → Retry deployment).
 3. On the phone: **Settings → AI model**, pick Woman or Man (or edit the description), tap
    **Create 2 options** (about 0.45 USD) and **Use this** on the one you like. Add a second pose
-   the same way (about 0.90 USD, it reuses the face of pose 1). Or use a full-body photo of
-   yourself instead, for free.
+   the same way. The presets ask for a casual phone photo at home, framed from the chin down so
+   no face appears. Or use a chin-down photo of yourself instead, for free.
 
 Costs per item: 3 credits per pose (Try-On Max, 2k, balanced), so about 0.45 USD with two
 poses. Photos are sent inline and results come back inline: FASHN deletes the inputs after

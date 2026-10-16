@@ -1,38 +1,41 @@
-// Your AI model: one person, created once, in up to 3 poses. Every try-on reuses
-// these exact photos, so the person, outfit base and backdrop stay the same on
-// every listing.
+// Your AI model: one body, created once, in up to 3 poses. Every try-on reuses
+// these exact photos, so the body, outfit base and room stay the same on every
+// listing. Photos are framed from the chin down and look like a phone photo at
+// home, like a private seller's own "worn" shots, not a catalogue.
 import { useEffect, useMemo, useState } from "react";
 import { errorText, postJson } from "./api";
 import { deletePose, listPoses, savePose, type ModelPose } from "./db";
-import { dataUriToBlob, resizeToJpeg, toBase64 } from "./photos";
+import { dataUriToBlob, resizeToJpeg } from "./photos";
 import "./model.css";
 
 export const MAX_POSES = 3;
-// FASHN credits at about 0.075 USD each: model-create 2k balanced is 3 per image,
-// plus 3 per image when a face reference keeps the same person.
-const COST_FIRST = "about 0.45 USD";
-const COST_MORE = "about 0.90 USD";
+// FASHN credits at about 0.075 USD each: model-create 2k balanced is 3 per image, 2 images.
+const COST_TRY = "about 0.45 USD";
+
+// Shared by both presets: how the photo looks and how it is framed.
+const LOOK =
+  "Casual smartphone photo taken at home by a friend, not a professional shoot: standing in front of a plain off-white wall in a bright apartment, wooden floor, soft natural window light, slightly imperfect framing, no studio lights, no retouching. Framed from the chin down to the shoes: the face and head are out of frame, not visible.";
 
 const PRESETS: { label: string; prompt: string }[] = [
   {
     label: "Woman",
     prompt:
-      "Ultra realistic full-body fashion photo of a woman in her late twenties, natural make-up, shoulder-length brown hair tied back, slim average build, wearing a plain fitted white t-shirt, slim light blue jeans and plain white sneakers. Plain light grey studio wall and floor, soft even daylight lighting, sharp focus, head to toe in frame, e-commerce catalogue style.",
+      `Realistic photo of a woman's body, slim average build, wearing a plain fitted white t-shirt, slim light blue jeans and plain white sneakers. ${LOOK}`,
   },
   {
     label: "Man",
     prompt:
-      "Ultra realistic full-body fashion photo of a man in his early thirties, short dark hair, light stubble, average athletic build, wearing a plain fitted white t-shirt, slim dark grey chinos and plain white sneakers. Plain light grey studio wall and floor, soft even daylight lighting, sharp focus, head to toe in frame, e-commerce catalogue style.",
+      `Realistic photo of a man's body, average build, wearing a plain fitted white t-shirt, slim dark grey chinos and plain white sneakers. ${LOOK}`,
   },
 ];
 
 const POSES = [
-  "Standing straight, facing the camera, arms relaxed at the sides, neutral friendly expression.",
-  "Three-quarter turn to the left, weight on one leg, one hand in a pocket, looking at the camera.",
-  "Walking slowly towards the camera, natural stride, arms relaxed.",
+  "Standing straight, facing the camera, arms relaxed at the sides.",
+  "Slight three-quarter turn to the left, weight on one leg, one hand in a pocket.",
+  "Relaxed stance, hands loosely together in front, slight bend in one knee.",
 ];
 
-const PROMPT_KEY = "model-prompt";
+const PROMPT_KEY = "model-prompt-v2"; // v1 held the studio-style prompt
 const readPrompt = () => {
   try {
     return localStorage.getItem(PROMPT_KEY) ?? PRESETS[0].prompt;
@@ -76,15 +79,12 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
       } catch {
         // Only a convenience; the prompt is also kept with each saved pose.
       }
-      // Later poses reuse the person text of pose 1 and its face as a reference.
+      // Later poses reuse the text of pose 1; with no face in frame, body, outfit and room carry the likeness.
       const base = first ? first.prompt || person : person;
       const prompt = first
-        ? `${base} Same person, same outfit, same studio. Pose: ${pose}`
+        ? `${base} Same body, same outfit, same room and light. Pose: ${pose}`
         : `${base} Pose: ${pose}`;
-      const { images } = await postJson<{ images: string[] }>("/api/model", {
-        prompt,
-        face_reference: first ? await toBase64(first.blob) : undefined,
-      });
+      const { images } = await postJson<{ images: string[] }>("/api/model", { prompt });
       setCandidates(images.map((uri) => ({ uri, base })));
     } catch (e) {
       setError(errorText(e));
@@ -109,8 +109,9 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
         <h1>AI model</h1>
       </header>
       <p className="hint">
-        Create one model once. Each garment is then put on these same photos, so every listing shows the same person,
-        pose and backdrop. Each pose gives one AI photo per item (about 0.23 USD each).
+        Create one model once. Each garment is then put on these same photos, so every listing shows the same body,
+        pose and room, framed from the chin down like a photo taken at home. Each pose gives one AI photo per item
+        (about 0.23 USD each).
       </p>
 
       {poses.length > 0 && (
@@ -123,7 +124,7 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
                 <button
                   className="link danger"
                   onClick={async () => {
-                    if (!confirm(i === 0 && poses.length > 1 ? "Delete pose 1? Later poses keep their face." : "Delete this pose?")) return;
+                    if (!confirm("Delete this pose?")) return;
                     await deletePose(p.id);
                     await reload();
                   }}
@@ -149,11 +150,12 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
                 ))}
               </div>
               <label>
-                Person, base outfit and backdrop
+                Body, base outfit and room
                 <textarea rows={6} value={person} onChange={(e) => setPerson(e.target.value)} />
               </label>
               <p className="hint">
                 Keep the base outfit plain and fitted (white t-shirt, slim trousers): try-on swaps it for your garment.
+                Keep "face out of frame" if you don't want a face on your listings.
               </p>
             </>
           )}
@@ -181,8 +183,8 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
             </label>
           </div>
           <p className="hint">
-            {first ? COST_MORE : COST_FIRST} per try. "Use my own photo": a full-body photo of yourself, or of someone who
-            agreed, against a plain wall.
+            {COST_TRY} per try. "Use my own photo": a photo of yourself (or someone who agreed) from the chin down,
+            against a plain wall, in a plain fitted t-shirt and trousers. Free.
           </p>
           {candidates.length > 0 && (
             <div className="poses">
