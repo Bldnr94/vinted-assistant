@@ -22,7 +22,13 @@ publish yourself.
    fal.ai, about 0.018 USD a photo) and copied pixel for pixel, so colours and defects stay as
    shot. Label and defect close-ups are never changed. If the cutout's colours differ from your
    photo, the app keeps the original unless you choose otherwise.
-5. **List it**: save the photos in listing order, open Vinted, copy the title and
+5. **On model** (optional): the garment goes on your own AI model (FASHN Try-On Max), one
+   photo per saved pose, about 0.23 USD each. You create the model once in
+   Settings → AI model, in up to 3 poses, so every listing shows the same person and backdrop.
+   AI photos start unticked; tick only those whose colour, print and fit match the real item.
+   Ticked ones go after every real photo, and the description gets a line saying they are
+   AI-generated illustrations.
+6. **List it**: save the photos in listing order, open Vinted, copy the title and
    description, tap the listed values into the form, press publish in Vinted.
 
 ## Setup (about 30 minutes, once)
@@ -51,6 +57,22 @@ You need: a GitHub account (this repo), an Anthropic API account, a free Cloudfl
 
 1. Sign up at https://fal.ai, add credit (5 USD lasts about 250 photos), and create an API key.
 2. In Cloudflare Pages, add it as the secret `FAL_KEY`, then redeploy.
+
+### 2c. FASHN key (AI model photos, optional)
+
+1. Sign up at https://app.fashn.ai, open **Developer API**, buy credits (about 0.075 USD each,
+   minimum top-up around 7.50 USD) and create an API key.
+2. In Cloudflare Pages, **Settings → Variables and Secrets**, add it for Production as the
+   **Secret** `FASHN_API_KEY`, then redeploy (Deployments → ⋯ → Retry deployment).
+3. On the phone: **Settings → AI model**, pick Woman or Man (or edit the description), tap
+   **Create 2 options** (about 0.45 USD) and **Use this** on the one you like. Add a second pose
+   the same way (about 0.90 USD, it reuses the face of pose 1). Or use a full-body photo of
+   yourself instead, for free.
+
+Costs per item: 3 credits per pose (Try-On Max, 2k, balanced), so about 0.45 USD with two
+poses. Photos are sent inline and results come back inline: FASHN deletes the inputs after
+processing and keeps the outputs for one hour; it keeps a record of each request (no images).
+FASHN does not train on your images.
 
 ### 3. Lock it to you (recommended)
 
@@ -88,5 +110,7 @@ npm run preview                  # builds and serves app + /api/draft on http://
 
 - `src/`: the React PWA (screens in `App.tsx`, IndexedDB in `db.ts`, photo resize in `photos.ts`).
 - `functions/api/draft.ts`: the Cloudflare Pages Function that calls Claude.
+- `src/ModelSetup.tsx` + `functions/api/model.ts`: create your AI model (FASHN Model Create).
+- `src/ModelPhotos.tsx` + `functions/api/tryon.ts`: put an item on it (FASHN Try-On Max).
 - `shared/listing.ts`: Vinted vocabulary (conditions, colours), shot list, draft schema.
   Correct the colour list or conditions here if vinted.fr's form differs.

@@ -51,6 +51,13 @@ export async function toDataUri(url: string): Promise<string> {
 
 const FASHN = "https://api.fashn.ai/v1";
 
+// FASHN seeds are 0 to 2^32 - 1; the same seed and inputs give the same image.
+export function seedOf(v: unknown): number {
+  return typeof v === "number" && Number.isInteger(v) && v >= 0 && v < 2 ** 32
+    ? v
+    : Math.floor(Math.random() * 2 ** 32);
+}
+
 // Runs one FASHN prediction and waits for it. Returns the output images as data URIs.
 export async function runFashn(
   apiKey: string,
