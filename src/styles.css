@@ -96,6 +96,17 @@ label.inline input { width: auto; margin: 0; }
 .vinted-send { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
 .vinted-send p:first-child { margin-top: 0; }
 h2.or { font-size: 15px; color: var(--muted); margin: 20px 0 8px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
+.chip { padding: 6px 12px; font-size: 14px; border-radius: 999px; }
+.chip.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.drops { background: var(--warn-bg); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.drops h2 { font-size: 16px; margin: 0 0 4px; color: var(--warn); }
+.drops .hint { margin: 0 0 10px; }
+.drop { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.drop .item { background: var(--bg); }
+.drop-actions { display: flex; gap: 8px; align-items: center; }
+.drop-actions input { width: 80px; margin: 0; flex: none; }
+.item-title { font-size: 18px; margin: 12px 0; }
 .items li { display: flex; gap: 8px; align-items: center; }
 .items li .item { flex: 1; min-width: 0; }
 .retry { white-space: nowrap; margin-bottom: 8px; }
