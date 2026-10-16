@@ -111,7 +111,7 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
       <p className="hint">
         Create one model once. Each garment is then put on these same photos, so every listing shows the same body,
         pose and room, framed from the chin down like a photo taken at home. Each pose gives one AI photo per item
-        (about 0.23 USD each).
+        (about 0.08 USD each).
       </p>
 
       {poses.length > 0 && (

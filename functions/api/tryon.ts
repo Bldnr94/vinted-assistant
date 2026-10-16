@@ -6,6 +6,9 @@ import { checkRequest, isBase64Image, json, readJson, runFashn, seedOf } from ".
 interface Env {
   APP_TOKEN: string;
   FASHN_API_KEY: string;
+  // "fast" (default): 1k, 1 credit (~0.075 USD) a photo, plenty for Vinted's small photos.
+  // "quality": 2k balanced, 3 credits (~0.23 USD) a photo.
+  TRYON_QUALITY?: string;
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -23,8 +26,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       product_image: `data:image/${productType};base64,${body.product}`,
       model_image: `data:image/jpeg;base64,${body.model}`,
       prompt: typeof body.prompt === "string" ? body.prompt.slice(0, 300) : "",
-      resolution: "2k",
-      generation_mode: "balanced",
+      ...(env.TRYON_QUALITY === "quality"
+        ? { resolution: "2k", generation_mode: "balanced" }
+        : { resolution: "1k", generation_mode: "fast" }),
       output_format: "jpeg",
       seed: seedOf(body.seed),
       return_base64: true,
