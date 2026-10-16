@@ -2,7 +2,7 @@
 // vinted.fr's plain sell page. The Annonces userscript there reads the link from the clipboard
 // when you tap "Fill the form". The link never goes into a Vinted address, so Vinted's pages
 // and app never see it.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { HandoffPackage } from "../shared/listing";
 import { readToken } from "./App";
 import type { Item } from "./db";
@@ -28,7 +28,8 @@ async function buildPackage(item: Item): Promise<HandoffPackage> {
   };
 }
 
-export function VintedSend({ item }: { item: Item }) {
+// children: shown once the link is ready, for marking the item live after you publish.
+export function VintedSend({ item, children }: { item: Item; children?: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [link, setLink] = useState("");
@@ -78,6 +79,7 @@ export function VintedSend({ item }: { item: Item }) {
             Vinted app or a browser without the script (on Android, anything but Firefox), open{" "}
             {SELL_URL.replace("https://", "")} in Safari or Firefox yourself; the link stays copied for one hour.
           </p>
+          {children}
         </>
       )}
       {error && <p className="error">{error}</p>}

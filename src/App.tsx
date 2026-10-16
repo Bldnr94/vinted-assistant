@@ -14,14 +14,14 @@ import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
 import { ModelPhotos } from "./ModelPhotos";
 import { ModelSetup } from "./ModelSetup";
-import { Replies, ReplySettingsFields } from "./Replies";
-import { draftLabel, enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
+import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
+import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
 
 export type Screen =
   | { name: "home" }
   | { name: "settings" }
   | { name: "model"; back: Screen }
-  | { name: "capture" | "review" | "studio" | "worn" | "handoff" | "replies"; id: string; batch?: boolean };
+  | { name: "capture" | "review" | "studio" | "worn" | "handoff" | "item"; id: string; batch?: boolean };
 
 const TOKEN_KEY = "app-token";
 export function readToken(): string {
@@ -45,7 +45,7 @@ export default function App() {
       {screen.name === "worn" && <ModelPhotos id={screen.id} go={setScreen} />}
       {screen.name === "model" && <ModelSetup onBack={() => setScreen(screen.back)} />}
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
-      {screen.name === "replies" && <Replies id={screen.id} go={setScreen} />}
+      {screen.name === "item" && <ItemPage id={screen.id} go={setScreen} />}
     </main>
   );
 }
@@ -95,11 +95,6 @@ export function Thumb({ blob, onRemove }: { blob: Blob; onRemove?: () => void })
 }
 
 function Home({ go }: { go: Go }) {
-  const [items, setItems] = useState<Item[]>();
-  const queue = useQueueVersion();
-  useEffect(() => {
-    listItems().then(setItems);
-  }, [queue]);
   const start = async (batch?: boolean) => {
     const item = newItem();
     await saveItem(item);
@@ -128,31 +123,7 @@ function Home({ go }: { go: Go }) {
         </button>
       </div>
       <p className="hint">Batch: photograph several items in a row; each one drafts in the background.</p>
-      <ul className="items">
-        {items?.map((it) => (
-          <li key={it.id}>
-            <button
-              className="item"
-              onClick={() => go({ name: it.draft ? "review" : "capture", id: it.id })}
-            >
-              {it.photos[0] ? <Thumb blob={orderedPhotos(it.photos)[0].blob} /> : <div className="thumb empty" />}
-              <span>
-                <strong>{it.draft?.title || "Untitled item"}</strong>
-                <small>
-                  {it.status === "listed" ? `Listed · ${it.listedPrice ?? "?"} €` : draftLabel(it)} ·{" "}
-                  {it.photos.length} photos
-                </small>
-                {it.draftState === "failed" && <small className="error">{it.draftError}</small>}
-              </span>
-            </button>
-            {it.draftState === "failed" && (
-              <button className="retry" onClick={() => enqueue(it.id)}>
-                Retry draft
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
+      <Inventory go={go} />
     </>
   );
 }
@@ -193,6 +164,7 @@ function Settings({ go }: { go: Go }) {
         On this phone, the photo never leaves it; the first use downloads an 88 MB model, so use Wi-Fi. fal.ai needs
         FAL_KEY in Cloudflare.
       </p>
+      <DropSettingsFields />
       <div className="actions">
         <button className="primary" onClick={save}>
           Save
@@ -528,7 +500,9 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         </button>
         <h1>List it</h1>
       </header>
-      <VintedSend item={item} />
+      <VintedSend item={item}>
+        <MarkLive item={item} update={update} go={go} />
+      </VintedSend>
       <h2 className="or">Or by hand</h2>
       <ol className="steps">
         <li>
@@ -570,15 +544,7 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         <li>
           <p>Check everything in Vinted, then press publish there.</p>
           <div className="actions">
-            <button
-              onClick={async () => {
-                await update({ ...item, status: "listed", listedPrice: d.price_suggested_eur });
-                go({ name: "home" });
-              }}
-            >
-              Mark as listed
-            </button>
-            <button onClick={() => go({ name: "replies", id })}>Buyer replies</button>
+            <MarkLive item={item} update={update} go={go} />
             <button
               className="danger"
               onClick={async () => {
