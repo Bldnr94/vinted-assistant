@@ -3,24 +3,19 @@
 // when you tap "Fill the form". The link never goes into a Vinted address, so Vinted's pages
 // and app never see it.
 import { useState } from "react";
-import { AI_NOTICE, type HandoffPackage } from "../shared/listing";
+import type { HandoffPackage } from "../shared/listing";
 import { readToken } from "./App";
 import type { Item } from "./db";
-import { hasAiImages, listingPhotos, toBase64 } from "./photos";
+import { listingDescription, listingPhotos, toBase64 } from "./photos";
 
 const SELL_URL = "https://www.vinted.fr/items/new";
-
-export function listingDescription(item: Item): string {
-  const text = item.draft?.description.trim() ?? "";
-  return hasAiImages(item.photos) && !text.includes(AI_NOTICE) ? `${text}\n\n${AI_NOTICE}` : text;
-}
 
 async function buildPackage(item: Item): Promise<HandoffPackage> {
   const d = item.draft!;
   return {
     listing: {
       title: d.title,
-      description: listingDescription(item),
+      description: listingDescription(d.description, item.photos),
       price: d.price_suggested_eur,
       brand: d.brand,
       size: d.size,

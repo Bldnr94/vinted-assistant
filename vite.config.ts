@@ -25,7 +25,6 @@ export default defineConfig({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/api\//, /\.user\.js$/],
-        navigateFallbackDenylist: [/^\/api\//],
         // The cutout runtime and model load from /cutout/ on first use, not at install.
         globPatterns: ["**/*.{js,css,html,svg,png}"],
       },
