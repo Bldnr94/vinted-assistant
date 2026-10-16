@@ -16,12 +16,13 @@ import { ModelPhotos } from "./ModelPhotos";
 import { ModelSetup } from "./ModelSetup";
 import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
 import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
+import { Replies, ReplySettingsFields } from "./Replies";
 
 export type Screen =
   | { name: "home" }
   | { name: "settings" }
   | { name: "model"; back: Screen }
-  | { name: "capture" | "review" | "studio" | "worn" | "handoff" | "item"; id: string; batch?: boolean };
+  | { name: "capture" | "review" | "studio" | "worn" | "handoff" | "item" | "replies"; id: string; batch?: boolean };
 
 const TOKEN_KEY = "app-token";
 export function readToken(): string {
@@ -46,6 +47,7 @@ export default function App() {
       {screen.name === "model" && <ModelSetup onBack={() => setScreen(screen.back)} />}
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
       {screen.name === "item" && <ItemPage id={screen.id} go={setScreen} />}
+      {screen.name === "replies" && <Replies id={screen.id} go={setScreen} />}
     </main>
   );
 }

@@ -25,8 +25,8 @@ export function Replies({ id, go }: { id: string; go: Go }) {
   return (
     <>
       <header>
-        <button className="link" onClick={() => go({ name: "review", id })}>
-          ‹ Draft
+        <button className="link" onClick={() => go({ name: item.status === "draft" ? "review" : "item", id })}>
+          ‹ {item.status === "draft" ? "Draft" : "Item"}
         </button>
         <h1>Buyer replies</h1>
       </header>
