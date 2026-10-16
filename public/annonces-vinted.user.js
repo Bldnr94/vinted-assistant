@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Annonces → Vinted
 // @namespace    https://github.com/Bldnr94/vinted-assistant
-// @version      1.0.3
+// @version      1.0.4
 // @description  Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.
 // @match        https://www.vinted.fr/*
 // @grant        GM.xmlHttpRequest
@@ -30,24 +30,18 @@
 (function () {
   "use strict";
 
-  // Ways to find each field, tried in order. Unverified guesses until the first form report.
+  // Ways to find each field, tried in order. The first selector of each is what vinted.fr's
+  // sell form used in October 2026 (from form reports); the rest are fallbacks.
   const FIELDS = {
-    photos: ['input[type="file"][accept*="image"]', 'input[type="file"]'],
+    photos: ['[data-testid="add-photos-input"]', 'input[type="file"][accept*="image"]', 'input[type="file"]'],
     title: ['[data-testid="title--input"]', 'input[name="title"]', "#title"],
     description: ['[data-testid="description--input"]', 'textarea[name="description"]', "#description"],
     category: ['[data-testid="catalog-select-dropdown-input"]', 'input[name="category"]', "#category"],
     brand: ['[data-testid="brand-select-dropdown-input"]', 'input[name="brand"]', "#brand"],
-    size: ['[data-testid="size-select-dropdown-input"]', 'input[name="size"]', "#size"],
-    condition: [
-      '[data-testid="status-select-dropdown-input"]',
-      '[data-testid="condition-select-dropdown-input"]',
-      'input[name="status"]',
-      'input[name="condition"]',
-      "#status",
-      "#condition",
-    ],
+    size: ['[data-testid="category-size-single-grid_chips-input"]', 'input[name="size"]', "#size"],
+    condition: ['[data-testid="category-condition-single-list-input"]', 'input[name="condition"]', "#condition"],
     colour: ['[data-testid="color-select-dropdown-input"]', 'input[name="color"]', "#color"],
-    material: ['[data-testid="material-select-dropdown-input"]', 'input[name="material"]', "#material"],
+    material: ['[data-testid="category-material-multi-list-input"]', 'input[name="material"]', "#material"],
     price: ['[data-testid="price-input--input"]', 'input[name="price"]', "#price"],
   };
 
@@ -60,9 +54,18 @@
     size: ["taille"],
     condition: ["etat"],
     colour: ["couleur"],
-    material: ["matiere"],
+    material: ["materiau", "matiere"],
     price: ["prix"],
   };
+
+  // Search boxes inside the category and brand pickers.
+  const SEARCH = {
+    category: ['#catalog-search-input', 'input[name="catalog-search-input"]'],
+    brand: ['[data-testid="brand-search--input"]', "#brand-search-input"],
+  };
+
+  // The "Fait" button that closes a picker and keeps the choice.
+  const PICKER_DONE = '[data-testid="input-dropdown-save-button"]';
 
   // Elements the script must never click: publishing, saving, or leaving the page.
   const FORBIDDEN_TEXT = /publi|mettre en ligne|ajouter l.article|enregistrer|sauvegarder|brouillon|upload|submit/i;
@@ -82,6 +85,7 @@
       .replace(/[̀-ͯ]/g, "")
       .toLowerCase()
       .replace(/[’']/g, "'")
+      .replace(/\s*&\s*/g, " et ")
       .replace(/\s+/g, " ")
       .trim();
 
@@ -217,13 +221,35 @@
     return w;
   }
 
-  function closeDropdown(input) {
-    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+  // Closes a picker with its "Fait" button when it has one, which keeps the choice.
+  async function closeDropdown(input) {
+    const done = Array.from(document.querySelectorAll(PICKER_DONE)).find(visible);
+    if (done) tap(done);
+    else input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     document.activeElement?.blur?.();
+    await pause(300, 600);
   }
 
+  // Taps an option. Picker rows hold a radio or checkbox next to the text; tapping that
+  // input is what selects the row.
+  function pick(opt) {
+    const row = opt.closest("li") || opt;
+    const box = row.querySelector('input[type="radio"], input[type="checkbox"]');
+    tap(box || opt);
+  }
+
+  const findIn = (selectors) => {
+    for (const sel of selectors || []) {
+      const el = Array.from(document.querySelectorAll(sel)).find(visible);
+      if (el) return el;
+    }
+    return null;
+  };
+
   // A search box inside an open dropdown, or the field itself when it is typeable.
-  function searchBox(input, fresh) {
+  function searchBox(input, fresh, field) {
+    const known = findIn(SEARCH[field]);
+    if (known) return known;
     const active = document.activeElement;
     if (active && active !== input && active.matches?.("input") && !insidePanel(active)) return active;
     const added = Array.from(fresh).find((el) => el.matches?.('input[type="text"], input[type="search"], input:not([type])') && visible(el));
@@ -271,6 +297,9 @@
     return `ok, ${files.length} sent; check the order`;
   }
 
+  // Walks Vinted's category tree level by level ("Femmes", then "Vêtements", ...). A level
+  // that isn't there is skipped; if the tree runs out, the picker's search box is used
+  // with the last part of the path.
   async function fillCategory(path) {
     const parts = String(path || "")
       .split(">")
@@ -280,21 +309,38 @@
     const input = await waitFor(() => find("category"));
     if (!input) return "field not found";
     let w = await openDropdown(input);
+    let reached = 0;
     try {
       for (let i = 0; i < parts.length; i++) {
         const want = norm(parts[i]);
-        // "Vêtements" is often skipped by Vinted's tree; tolerate a missing level.
         const opt = await waitFor(() => findOption((t) => t === want, w.fresh), 2500);
         if (!opt) {
           if (i > 0 && i < parts.length - 1) continue;
-          return `stopped at "${parts[i]}"`;
+          break;
         }
         w.stop();
         w = watchAdded();
-        tap(opt);
+        pick(opt);
+        reached = i + 1;
         await pause(600, 1100);
       }
-      return "ok";
+      if (reached < parts.length) {
+        const leaf = parts[parts.length - 1];
+        const box = findIn(SEARCH.category);
+        if (!box) return reached ? `stopped after "${parts[reached - 1]}"` : `stopped at "${parts[0]}"`;
+        await typeInto(box, leaf);
+        await pause(900, 1400);
+        const opt = await waitFor(() => bestOption(leaf, w.fresh), 3000);
+        if (!opt) return `no category matched "${leaf}"`;
+        pick(opt);
+        await pause(600, 1000);
+      }
+      if (norm(input.value)) {
+        if (Array.from(document.querySelectorAll(PICKER_DONE)).some(visible)) await closeDropdown(input);
+        return "ok";
+      }
+      await closeDropdown(input);
+      return norm(input.value) ? "ok" : "check it";
     } finally {
       w.stop();
     }
@@ -313,7 +359,7 @@
     try {
       for (const want of wants) {
         if (search) {
-          const box = searchBox(input, w.fresh);
+          const box = searchBox(input, w.fresh, field);
           if (box) {
             await typeInto(box, want);
             await pause(700, 1200);
@@ -321,14 +367,18 @@
         }
         const opt = await waitFor(() => bestOption(want, w.fresh), 2500);
         if (!opt) continue;
-        tap(opt);
+        pick(opt);
         done.push(want);
         await pause(400, 800);
         if (!multi) break;
       }
     } finally {
       w.stop();
-      if (multi || !done.length) closeDropdown(input);
+      await pause(400, 700);
+      // Single-choice pickers usually close on their own; close any that stayed open.
+      if (multi || !done.length || Array.from(document.querySelectorAll(PICKER_DONE)).some(visible)) {
+        await closeDropdown(input);
+      }
     }
     if (!done.length) return `no option matched "${wants.join(", ")}"`;
     return done.length < wants.length ? `ok for ${done.join(", ")} only` : "ok";
@@ -340,7 +390,8 @@
     const w = norm(want);
     const exact = findOption((t) => t === w, fresh);
     if (exact) return exact;
-    const starts = findOption((t) => t.startsWith(w + " ") || t.startsWith(w + "\n"), fresh);
+    // Condition rows read "tres bon etatpeu porte...": title and description run together.
+    const starts = findOption((t) => t.length > w.length && t.startsWith(w), fresh);
     if (starts && fresh.has(starts)) return starts;
     const tokens = w.split(/[\s/,()-]+/).filter((x) => x && x !== "fr" && x !== "eu" && x !== "taille");
     if (!tokens.length) return null;
@@ -459,7 +510,7 @@
         row.className = ok ? "ok" : skip ? "" : "warn";
         await pause();
       }
-      log("Done. Check every field and the photo order, then press publish yourself.", "ok");
+      log("Done. Pick the parcel size, check every field and the photo order, then press Ajouter yourself.", "ok");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       log(e.message, "warn");
