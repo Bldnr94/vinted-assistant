@@ -171,6 +171,20 @@ List 3 real items end to end and note, for each:
   first **Form report** to the project thread so the field rules can be checked against the
   real form.
 
+## Inventory and price drops
+
+The home screen lists every item as **Draft**, **Live** or **Sold**. Nothing reads Vinted: you
+mark each change yourself.
+
+- After you press publish on Vinted, tap **Published on Vinted: mark live** on the List it screen.
+  The item goes live at the drafted price, with a floor (the low end of the drafted range, or 70%
+  of the price) that you can change on the item.
+- When a live item has kept the same price for 14 days, it shows under **Needs a price drop** with
+  a suggested price about 12% lower, never below its floor. Lower it on Vinted, then tap
+  **I lowered it**; **Not yet** hides it for 7 days. The days and percentage are in Settings.
+- **Mark as sold** records the sale price. Sales are kept even if you delete the item, so they can
+  feed price suggestions later.
+
 ## Local development
 
 ```sh

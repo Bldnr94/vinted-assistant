@@ -1,5 +1,6 @@
 // Items, their photos and your AI model photos live in the phone browser's IndexedDB.
 import type { Draft, ShotKind } from "../shared/listing";
+import { defaultFloor } from "./pricing";
 
 export interface Photo {
   id: string;
@@ -13,17 +14,47 @@ export interface Photo {
   include?: boolean; // AI images only: false until you approve it
 }
 
+// draft: not on Vinted yet. live: you published it. sold: you marked it sold.
+export type ItemStatus = "draft" | "live" | "sold";
+
+export interface PriceChange {
+  price: number;
+  at: number;
+}
+
 export interface Item {
   id: string;
   createdAt: number;
   updatedAt: number;
-  status: "draft" | "listed";
+  status: ItemStatus;
   notes: string;
   photos: Photo[];
   draft?: Draft;
   draftModel?: string;
   draftTokens?: { input_tokens: number; output_tokens: number };
-  listedPrice?: number;
+  listedPrice?: number; // current asking price on Vinted
+  listedAt?: number;
+  priceHistory?: PriceChange[]; // first entry is the price it went live at
+  vintedUrl?: string; // optional, to open the listing from a reminder
+  floorPrice?: number; // price-drop suggestions never go below this
+  snoozedUntil?: number; // no price-drop reminder before this time
+  soldAt?: number;
+  soldPrice?: number;
+}
+
+// One row per sale, kept when the item and its photos are deleted, to feed price suggestions later.
+export interface Sale {
+  itemId: string;
+  title: string;
+  brand: string;
+  category_path: string;
+  size: string;
+  condition: string;
+  firstPrice: number;
+  listedPrice: number;
+  soldPrice: number;
+  listedAt: number;
+  soldAt: number;
 }
 
 export interface ModelPose {
@@ -36,14 +67,38 @@ export interface ModelPose {
 const DB_NAME = "vinted-assistant";
 const ITEMS = "items";
 const POSES = "model-poses";
+const SALES = "sales";
 
 function open(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 2);
-    req.onupgradeneeded = () => {
+    const req = indexedDB.open(DB_NAME, 3);
+    req.onupgradeneeded = (e) => {
       const db = req.result;
       if (!db.objectStoreNames.contains(ITEMS)) db.createObjectStore(ITEMS, { keyPath: "id" });
       if (!db.objectStoreNames.contains(POSES)) db.createObjectStore(POSES, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(SALES)) db.createObjectStore(SALES, { keyPath: "itemId" });
+      // Version 3: "listed" became "live", with the date and price it went live at.
+      if (e.oldVersion > 0 && e.oldVersion < 3) {
+        const cursor = req.transaction!.objectStore(ITEMS).openCursor();
+        cursor.onsuccess = () => {
+          const c = cursor.result;
+          if (!c) return;
+          const item = c.value as Omit<Item, "status"> & { status: string };
+          if (item.status === "listed") {
+            const at = item.updatedAt;
+            const price = item.listedPrice ?? item.draft?.price_suggested_eur;
+            c.update({
+              ...item,
+              status: "live",
+              listedAt: at,
+              listedPrice: price,
+              priceHistory: price === undefined ? [] : [{ price, at }],
+              floorPrice: price === undefined ? undefined : defaultFloor(price, item.draft?.price_min_eur),
+            });
+          }
+          c.continue();
+        };
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -67,6 +122,12 @@ export const getItem = (id: string) => run<Item | undefined>(ITEMS, "readonly", 
 export const saveItem = (item: Item) => run(ITEMS, "readwrite", (s) => s.put({ ...item, updatedAt: Date.now() }));
 
 export const deleteItem = (id: string) => run(ITEMS, "readwrite", (s) => s.delete(id));
+
+export const listSales = () => run<Sale[]>(SALES, "readonly", (s) => s.getAll());
+
+export const saveSale = (sale: Sale) => run(SALES, "readwrite", (s) => s.put(sale));
+
+export const deleteSale = (itemId: string) => run(SALES, "readwrite", (s) => s.delete(itemId));
 
 export function newItem(): Item {
   const now = Date.now();
