@@ -119,8 +119,8 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         </>
       )}
       <div className="actions">
-        <button className="primary" disabled={!!busy} onClick={() => go({ name: "handoff", id })}>
-          Ready to list
+        <button className="primary" disabled={!!busy} onClick={() => go({ name: "worn", id })}>
+          Next: on model
         </button>
       </div>
     </>

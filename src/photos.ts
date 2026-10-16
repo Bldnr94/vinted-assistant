@@ -1,7 +1,7 @@
 // Photo handling on the phone. Real photos are resized and, on request, placed on a
 // studio background; the garment's own pixels are copied unchanged so defects and
 // colours stay exactly as shot.
-import { SHOT_ORDER, type DraftImage, type ShotKind } from "../shared/listing";
+import { AI_NOTICE, SHOT_ORDER, type DraftImage, type ShotKind } from "../shared/listing";
 import type { Photo } from "./db";
 
 const MAX_SIDE = 1600;
@@ -56,6 +56,10 @@ export function listingPhotos(photos: Photo[]): { photo: Photo; blob: Blob }[] {
 }
 
 export const hasAiImages = (photos: Photo[]) => photos.some((p) => p.kind === "ai_model" && p.include);
+
+// The description as it goes on Vinted: ends with the AI notice whenever AI images are included.
+export const listingDescription = (description: string, photos: Photo[]) =>
+  hasAiImages(photos) && !description.includes(AI_NOTICE) ? `${description.trimEnd()}\n\n${AI_NOTICE}` : description;
 
 export async function toDraftImages(photos: Photo[]): Promise<DraftImage[]> {
   // Labels and defects matter most to the draft, so they go first if we hit the cap.

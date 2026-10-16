@@ -10,11 +10,17 @@ import {
   type ShotKind,
 } from "../shared/listing";
 import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
-import { listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
 import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
+import { ModelPhotos } from "./ModelPhotos";
+import { ModelSetup } from "./ModelSetup";
 
-export type Screen = { name: "home" } | { name: "settings" } | { name: "capture" | "review" | "studio" | "handoff"; id: string };
+export type Screen =
+  | { name: "home" }
+  | { name: "settings" }
+  | { name: "model"; back: Screen }
+  | { name: "capture" | "review" | "studio" | "worn" | "handoff"; id: string };
 
 const TOKEN_KEY = "app-token";
 export function readToken(): string {
@@ -34,6 +40,8 @@ export default function App() {
       {screen.name === "capture" && <Capture id={screen.id} go={setScreen} />}
       {screen.name === "review" && <Review id={screen.id} go={setScreen} />}
       {screen.name === "studio" && <Studio id={screen.id} go={setScreen} />}
+      {screen.name === "worn" && <ModelPhotos id={screen.id} go={setScreen} />}
+      {screen.name === "model" && <ModelSetup onBack={() => setScreen(screen.back)} />}
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
     </main>
   );
@@ -167,9 +175,12 @@ function Settings({ go }: { go: Go }) {
         On this phone, the photo never leaves it; the first use downloads an 88 MB model, so use Wi-Fi. fal.ai needs
         FAL_KEY in Cloudflare.
       </p>
-      <button className="primary" onClick={save}>
-        Save
-      </button>
+      <div className="actions">
+        <button className="primary" onClick={save}>
+          Save
+        </button>
+        <button onClick={() => go({ name: "model", back: { name: "settings" } })}>AI model</button>
+      </div>
     </>
   );
 }
@@ -457,8 +468,8 @@ function Handoff({ id, go }: { id: string; go: Go }) {
   return (
     <>
       <header>
-        <button className="link" onClick={() => go({ name: "studio", id })}>
-          ‹ Studio
+        <button className="link" onClick={() => go({ name: "worn", id })}>
+          ‹ On model
         </button>
         <h1>List it</h1>
       </header>
@@ -483,7 +494,7 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         <li>
           <div className="actions">
             <CopyButton text={d.title} label="Copy title" />
-            <CopyButton text={d.description} label="Copy description" />
+            <CopyButton text={listingDescription(d.description, item.photos)} label="Copy description" />
           </div>
         </li>
         <li>
