@@ -55,6 +55,9 @@ export interface Sale {
   soldPrice: number;
   listedAt: number;
   soldAt: number;
+  listedPrice?: number;
+  draftState?: "queued" | "drafting" | "failed"; // batch mode's background drafting queue
+  draftError?: string;
 }
 
 export interface ModelPose {

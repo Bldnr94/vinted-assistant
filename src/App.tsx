@@ -3,26 +3,26 @@ import {
   COLOURS,
   CONDITIONS,
   MAX_PHOTOS,
-  MAX_PHOTOS_TO_CLAUDE,
   SHOTS,
   type Draft,
-  type DraftResponse,
   type ShotKind,
 } from "../shared/listing";
 import { deleteItem, getItem, newItem, saveItem, type Item } from "./db";
 import { VintedSend } from "./VintedSend";
-import { listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg } from "./photos";
 import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
 import { ModelPhotos } from "./ModelPhotos";
 import { ModelSetup } from "./ModelSetup";
 import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
+import { draftLabel, enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
 
 export type Screen =
   | { name: "home" }
   | { name: "settings" }
   | { name: "model"; back: Screen }
   | { name: "capture" | "review" | "studio" | "worn" | "handoff" | "item"; id: string };
+  | { name: "capture" | "review" | "studio" | "worn" | "handoff"; id: string; batch?: boolean };
 
 const TOKEN_KEY = "app-token";
 export function readToken(): string {
@@ -35,11 +35,12 @@ export function readToken(): string {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: "home" });
+  useEffect(() => void resumeQueue(), []);
   return (
     <main>
       {screen.name === "home" && <Home go={setScreen} />}
       {screen.name === "settings" && <Settings go={setScreen} />}
-      {screen.name === "capture" && <Capture id={screen.id} go={setScreen} />}
+      {screen.name === "capture" && <Capture key={screen.id} id={screen.id} batch={screen.batch} go={setScreen} />}
       {screen.name === "review" && <Review id={screen.id} go={setScreen} />}
       {screen.name === "studio" && <Studio id={screen.id} go={setScreen} />}
       {screen.name === "worn" && <ModelPhotos id={screen.id} go={setScreen} />}
@@ -57,12 +58,14 @@ export type Go = (s: Screen) => void;
 export function useItem(id: string): [Item | undefined, (next: Item | ((cur: Item) => Item)) => Promise<void>] {
   const [item, setItem] = useState<Item>();
   const latest = useRef<Item>(undefined);
+  // Also reloads when the batch queue writes to items, so a background draft isn't overwritten.
+  const queue = useQueueVersion();
   useEffect(() => {
     getItem(id).then((i) => {
       latest.current = i;
       setItem(i);
     });
-  }, [id]);
+  }, [id, queue]);
   const update = async (next: Item | ((cur: Item) => Item)) => {
     const value = typeof next === "function" ? next(latest.current!) : next;
     latest.current = value;
@@ -94,9 +97,15 @@ export function Thumb({ blob, onRemove }: { blob: Blob; onRemove?: () => void })
 
 function Home({ go }: { go: Go }) {
   const start = async () => {
+  const [items, setItems] = useState<Item[]>();
+  const queue = useQueueVersion();
+  useEffect(() => {
+    listItems().then(setItems);
+  }, [queue]);
+  const start = async (batch?: boolean) => {
     const item = newItem();
     await saveItem(item);
-    go({ name: "capture", id: item.id });
+    go({ name: "capture", id: item.id, batch });
   };
   return (
     <>
@@ -116,6 +125,40 @@ function Home({ go }: { go: Go }) {
         New item
       </button>
       <Inventory go={go} />
+      <div className="actions">
+        <button className="primary big" onClick={() => start()}>
+          New item
+        </button>
+        <button className="big" onClick={() => start(true)}>
+          Batch
+        </button>
+      </div>
+      <p className="hint">Batch: photograph several items in a row; each one drafts in the background.</p>
+      <ul className="items">
+        {items?.map((it) => (
+          <li key={it.id}>
+            <button
+              className="item"
+              onClick={() => go({ name: it.draft ? "review" : "capture", id: it.id })}
+            >
+              {it.photos[0] ? <Thumb blob={orderedPhotos(it.photos)[0].blob} /> : <div className="thumb empty" />}
+              <span>
+                <strong>{it.draft?.title || "Untitled item"}</strong>
+                <small>
+                  {it.status === "listed" ? `Listed · ${it.listedPrice ?? "?"} €` : draftLabel(it)} ·{" "}
+                  {it.photos.length} photos
+                </small>
+                {it.draftState === "failed" && <small className="error">{it.draftError}</small>}
+              </span>
+            </button>
+            {it.draftState === "failed" && (
+              <button className="retry" onClick={() => enqueue(it.id)}>
+                Retry draft
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
     </>
   );
 }
@@ -167,7 +210,7 @@ function Settings({ go }: { go: Go }) {
   );
 }
 
-function Capture({ id, go }: { id: string; go: Go }) {
+function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
   const [item, update] = useItem(id);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -194,16 +237,8 @@ function Capture({ id, go }: { id: string; go: Go }) {
     setBusy(true);
     setError("");
     try {
-      const images = (await toDraftImages(item.photos)).slice(0, MAX_PHOTOS_TO_CLAUDE);
-      const res = await fetch("/api/draft", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-app-token": readToken() },
-        body: JSON.stringify({ images, notes: item.notes }),
-      });
-      const body = await res.json().catch(() => ({ error: `Server answered ${res.status}` }));
-      if (!res.ok) throw new Error(body.error || `Server answered ${res.status}`);
-      const { draft, model, usage } = body as DraftResponse;
-      await update({ ...item, draft, draftModel: model, draftTokens: usage });
+      const { draft, model, usage } = await requestDraft(item);
+      await update({ ...item, draft, draftModel: model, draftTokens: usage, draftState: undefined, draftError: undefined });
       go({ name: "review", id });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -212,13 +247,27 @@ function Capture({ id, go }: { id: string; go: Go }) {
     }
   };
 
+  // Batch: queue this item for background drafting and start the next one straight away.
+  const queueAndNext = async () => {
+    await enqueue(id);
+    const next = newItem();
+    await saveItem(next);
+    go({ name: "capture", id: next.id, batch: true });
+  };
+  const finishBatch = async () => {
+    if (item.photos.length) await enqueue(id);
+    else await deleteItem(id);
+    go({ name: "home" });
+  };
+  const queued = item.draftState === "queued" || item.draftState === "drafting";
+
   return (
     <>
       <header>
-        <button className="link" onClick={() => go({ name: "home" })}>
+        <button className="link" onClick={() => (batch ? finishBatch() : go({ name: "home" }))}>
           ‹ Items
         </button>
-        <h1>Photos</h1>
+        <h1>{batch ? "Batch photos" : "Photos"}</h1>
         <span className="count">
           {item.photos.length}/{MAX_PHOTOS}
         </span>
@@ -272,17 +321,46 @@ function Capture({ id, go }: { id: string; go: Go }) {
       </label>
       {missing.length > 0 && <p className="hint">Still missing: {missing.map((m) => m.label).join(", ")}.</p>}
       {error && <p className="error">{error}</p>}
-      <div className="actions">
-        <button className="primary" disabled={busy || item.photos.length === 0} onClick={draft}>
-          {busy ? "Drafting…" : item.draft ? "Redraft listing" : "Draft listing"}
-        </button>
-        {item.draft && (
-          <button onClick={() => go({ name: "review", id })} disabled={busy}>
-            Back to draft
+      {batch && <BatchStatus />}
+      {batch ? (
+        <div className="actions">
+          <button className="primary" disabled={item.photos.length === 0} onClick={queueAndNext}>
+            Draft in background, next item
           </button>
-        )}
-      </div>
+          <button onClick={finishBatch}>{item.photos.length ? "Draft this, finish batch" : "Finish batch"}</button>
+        </div>
+      ) : (
+        <div className="actions">
+          <button className="primary" disabled={busy || queued || item.photos.length === 0} onClick={draft}>
+            {busy || queued ? "Drafting…" : item.draft ? "Redraft listing" : "Draft listing"}
+          </button>
+          {item.draft && (
+            <button onClick={() => go({ name: "review", id })} disabled={busy}>
+              Back to draft
+            </button>
+          )}
+        </div>
+      )}
     </>
+  );
+}
+
+// One line under the batch capture screen: how the background drafts are doing.
+function BatchStatus() {
+  const queue = useQueueVersion();
+  const [items, setItems] = useState<Item[]>([]);
+  useEffect(() => {
+    listItems().then(setItems);
+  }, [queue]);
+  const count = (s: Item["draftState"]) => items.filter((i) => i.draftState === s).length;
+  const [waiting, drafting, failed] = [count("queued"), count("drafting"), count("failed")];
+  if (!waiting && !drafting && !failed) return null;
+  return (
+    <p className="hint">
+      In the background: {drafting ? "1 drafting" : ""}
+      {waiting ? `${drafting ? ", " : ""}${waiting} waiting` : ""}
+      {failed ? `${drafting || waiting ? ", " : ""}${failed} failed (retry from Items)` : ""}.
+    </p>
   );
 }
 
