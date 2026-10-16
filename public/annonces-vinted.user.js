@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Annonces → Vinted
 // @namespace    https://github.com/Bldnr94/vinted-assistant
-// @version      1.0.1
+// @version      1.0.2
 // @description  Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.
 // @match        https://www.vinted.fr/*
 // @grant        GM.xmlHttpRequest
@@ -467,29 +467,41 @@
 
   // Lists the form's fields so selectors can be fixed from a real page.
   function formReport() {
-    const root = document.querySelector("form") || document.querySelector("main") || document.body;
+    // The whole page except the site header, its search bar and this panel; the sell form
+    // is not necessarily the first <form> on the page.
+    const skip = (el) => insidePanel(el) || insideChrome(el) || /^search/.test(el.dataset?.testid || "");
     const rows = [];
-    root.querySelectorAll('input, textarea, select, button, [data-testid], [role="button"], [role="combobox"]').forEach((el) => {
-      if (insidePanel(el) || rows.length > 250) return;
-      const label = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      rows.push(
-        [
-          el.tagName.toLowerCase(),
+    const seen = new Set();
+    document.body
+      .querySelectorAll('input, textarea, select, button, label, h1, h2, h3, [data-testid], [role="button"], [role="combobox"]')
+      .forEach((el) => {
+        if (skip(el) || rows.length > 300) return;
+        const tag = el.tagName.toLowerCase();
+        const label = el.id && document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        const row = [
+          tag,
           el.type && `type=${el.type}`,
           el.name && `name=${el.name}`,
           el.id && `id=${el.id}`,
           el.dataset?.testid && `testid=${el.dataset.testid}`,
           el.placeholder && `placeholder=${el.placeholder}`,
           el.getAttribute("aria-label") && `aria=${el.getAttribute("aria-label")}`,
+          el.getAttribute("accept") && `accept=${el.getAttribute("accept")}`,
           el.readOnly && "readonly",
           el.multiple && "multiple",
+          !visible(el) && "hidden",
           label && `label=${norm(label.textContent).slice(0, 40)}`,
-          !["input", "textarea"].includes(el.tagName.toLowerCase()) && `text=${norm(el.textContent).slice(0, 40)}`,
+          !["input", "textarea"].includes(tag) && `text=${norm(el.textContent).slice(0, 50)}`,
         ]
           .filter(Boolean)
-          .join(" | "),
-      );
-    });
+          .join(" | ");
+        if (!seen.has(row)) {
+          seen.add(row);
+          rows.push(row);
+        }
+      });
+    const page = norm(document.body.innerText).slice(0, 300);
+    rows.unshift(`page text: ${page}`);
     const text = `Annonces form report, ${location.pathname}, ${navigator.userAgent}\n${rows.join("\n")}`;
     const copy = (typeof GM !== "undefined" && GM.setClipboard) || (typeof GM_setClipboard !== "undefined" && GM_setClipboard);
     Promise.resolve()
