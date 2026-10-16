@@ -10,12 +10,22 @@ import {
   type ShotKind,
 } from "../shared/listing";
 import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
-import { orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { VintedSend } from "./VintedSend";
+import { listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
+import { Studio } from "./Studio";
+import { ModelPhotos } from "./ModelPhotos";
+import { ModelSetup } from "./ModelSetup";
 
-type Screen = { name: "home" } | { name: "settings" } | { name: "capture" | "review" | "handoff"; id: string };
+export type Screen =
+  | { name: "home" }
+  | { name: "settings" }
+  | { name: "model"; back: Screen }
+  | { name: "capture" | "review" | "studio" | "worn" | "handoff"; id: string };
 
 const TOKEN_KEY = "app-token";
-function readToken(): string {
+export function readToken(): string {
   try {
     return localStorage.getItem(TOKEN_KEY) ?? "";
   } catch {
@@ -31,16 +41,19 @@ export default function App() {
       {screen.name === "settings" && <Settings go={setScreen} />}
       {screen.name === "capture" && <Capture id={screen.id} go={setScreen} />}
       {screen.name === "review" && <Review id={screen.id} go={setScreen} />}
+      {screen.name === "studio" && <Studio id={screen.id} go={setScreen} />}
+      {screen.name === "worn" && <ModelPhotos id={screen.id} go={setScreen} />}
+      {screen.name === "model" && <ModelSetup onBack={() => setScreen(screen.back)} />}
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
     </main>
   );
 }
 
-type Go = (s: Screen) => void;
+export type Go = (s: Screen) => void;
 
 // update() takes a new item or a function of the latest one, so quick
 // successive photo adds don't overwrite each other.
-function useItem(id: string): [Item | undefined, (next: Item | ((cur: Item) => Item)) => Promise<void>] {
+export function useItem(id: string): [Item | undefined, (next: Item | ((cur: Item) => Item)) => Promise<void>] {
   const [item, setItem] = useState<Item>();
   const latest = useRef<Item>(undefined);
   useEffect(() => {
@@ -64,7 +77,7 @@ function useObjectUrl(blob: Blob): string {
   return url;
 }
 
-function Thumb({ blob, onRemove }: { blob: Blob; onRemove?: () => void }) {
+export function Thumb({ blob, onRemove }: { blob: Blob; onRemove?: () => void }) {
   const url = useObjectUrl(blob);
   return (
     <div className="thumb">
@@ -130,12 +143,14 @@ function Home({ go }: { go: Go }) {
 
 function Settings({ go }: { go: Go }) {
   const [token, setToken] = useState(readToken);
+  const [engine, setEngine] = useState(readEngine);
   const save = () => {
     try {
       localStorage.setItem(TOKEN_KEY, token.trim());
     } catch {
       alert("This browser blocked local storage, so the token could not be saved.");
     }
+    saveEngine(engine);
     go({ name: "home" });
   };
   return (
@@ -151,9 +166,23 @@ function Settings({ go }: { go: Go }) {
         <input value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
       </label>
       <p className="hint">The same value as APP_TOKEN in Cloudflare. It stays on this phone.</p>
-      <button className="primary" onClick={save}>
-        Save
-      </button>
+      <label>
+        Studio cutout
+        <select value={engine} onChange={(e) => setEngine(e.target.value as CutoutEngine)}>
+          <option value="phone">On this phone (free)</option>
+          <option value="fal">fal.ai (cleaner edges, about 0.018 USD a photo)</option>
+        </select>
+      </label>
+      <p className="hint">
+        On this phone, the photo never leaves it; the first use downloads an 88 MB model, so use Wi-Fi. fal.ai needs
+        FAL_KEY in Cloudflare.
+      </p>
+      <div className="actions">
+        <button className="primary" onClick={save}>
+          Save
+        </button>
+        <button onClick={() => go({ name: "model", back: { name: "settings" } })}>AI model</button>
+      </div>
     </>
   );
 }
@@ -379,8 +408,8 @@ function Review({ id, go }: { id: string; go: Go }) {
         </p>
       )}
       <div className="actions">
-        <button className="primary" onClick={() => go({ name: "handoff", id })}>
-          Ready to list
+        <button className="primary" onClick={() => go({ name: "studio", id })}>
+          Next: photos
         </button>
       </div>
     </>
@@ -441,11 +470,13 @@ function Handoff({ id, go }: { id: string; go: Go }) {
   return (
     <>
       <header>
-        <button className="link" onClick={() => go({ name: "review", id })}>
-          ‹ Review
+        <button className="link" onClick={() => go({ name: "worn", id })}>
+          ‹ On model
         </button>
         <h1>List it</h1>
       </header>
+      <VintedSend item={item} />
+      <h2 className="or">Or by hand</h2>
       <ol className="steps">
         <li>
           <button className="primary" onClick={savePhotos}>
@@ -453,8 +484,8 @@ function Handoff({ id, go }: { id: string; go: Go }) {
           </button>
           {shared && <p className="hint">{shared}</p>}
           <div className="thumbs">
-            {orderedPhotos(item.photos).map((p) => (
-              <Thumb key={p.id} blob={p.blob} />
+            {listingPhotos(item.photos).map(({ photo, blob }) => (
+              <Thumb key={photo.id} blob={blob} />
             ))}
           </div>
         </li>
@@ -467,7 +498,7 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         <li>
           <div className="actions">
             <CopyButton text={d.title} label="Copy title" />
-            <CopyButton text={d.description} label="Copy description" />
+            <CopyButton text={listingDescription(d.description, item.photos)} label="Copy description" />
           </div>
         </li>
         <li>

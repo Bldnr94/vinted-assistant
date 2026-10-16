@@ -12,6 +12,7 @@ import {
   type DraftResponse,
   type ShotKind,
 } from "../../shared/listing";
+import { checkRequest, json, readJson } from "../../shared/server";
 
 interface Env {
   ANTHROPIC_API_KEY: string;
@@ -48,27 +49,12 @@ Field guidance:
 - Price in euros for vinted.fr, as rough rules of thumb, not market data: fast-fashion brands 3-10 EUR; mid-range high-street 8-25 EUR; premium or outdoor brands 20-35% of typical retail; designer items need the seller to check comparables. Lower by about a third for "Bon état", by half for "Satisfaisant", raise for "Neuf avec étiquette". Explain the reasoning in English in price_reasoning and say it is a rule-of-thumb estimate.
 - search_query: a short query the seller can paste into vinted.fr search to compare, e.g. "veste levis jean".`;
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json; charset=utf-8" },
-  });
-}
-
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
-  if (!env.ANTHROPIC_API_KEY || !env.APP_TOKEN) {
-    return json({ error: "Server is missing ANTHROPIC_API_KEY or APP_TOKEN." }, 500);
-  }
-  if (request.headers.get("x-app-token") !== env.APP_TOKEN) {
-    return json({ error: "Wrong or missing app token. Set it in Settings." }, 401);
-  }
+  const denied = checkRequest(request, env as unknown as Record<string, unknown>, ["ANTHROPIC_API_KEY"]);
+  if (denied) return denied;
 
-  let body: DraftRequest;
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: "Body must be JSON." }, 400);
-  }
+  const body = await readJson<DraftRequest>(request);
+  if (!body) return json({ error: "Body must be JSON." }, 400);
   const images = Array.isArray(body?.images) ? body.images : [];
   if (images.length === 0) return json({ error: "Add at least one photo." }, 400);
   if (images.some((i) => i?.media_type !== "image/jpeg" || typeof i?.data !== "string" || !(i.kind in KIND_LABEL))) {
