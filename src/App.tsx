@@ -10,12 +10,13 @@ import {
   type ShotKind,
 } from "../shared/listing";
 import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
-import { orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { listingPhotos, orderedPhotos, photoFiles, resizeToJpeg, toDraftImages } from "./photos";
+import { Studio } from "./Studio";
 
-type Screen = { name: "home" } | { name: "settings" } | { name: "capture" | "review" | "handoff"; id: string };
+export type Screen = { name: "home" } | { name: "settings" } | { name: "capture" | "review" | "studio" | "handoff"; id: string };
 
 const TOKEN_KEY = "app-token";
-function readToken(): string {
+export function readToken(): string {
   try {
     return localStorage.getItem(TOKEN_KEY) ?? "";
   } catch {
@@ -31,16 +32,17 @@ export default function App() {
       {screen.name === "settings" && <Settings go={setScreen} />}
       {screen.name === "capture" && <Capture id={screen.id} go={setScreen} />}
       {screen.name === "review" && <Review id={screen.id} go={setScreen} />}
+      {screen.name === "studio" && <Studio id={screen.id} go={setScreen} />}
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
     </main>
   );
 }
 
-type Go = (s: Screen) => void;
+export type Go = (s: Screen) => void;
 
 // update() takes a new item or a function of the latest one, so quick
 // successive photo adds don't overwrite each other.
-function useItem(id: string): [Item | undefined, (next: Item | ((cur: Item) => Item)) => Promise<void>] {
+export function useItem(id: string): [Item | undefined, (next: Item | ((cur: Item) => Item)) => Promise<void>] {
   const [item, setItem] = useState<Item>();
   const latest = useRef<Item>(undefined);
   useEffect(() => {
@@ -64,7 +66,7 @@ function useObjectUrl(blob: Blob): string {
   return url;
 }
 
-function Thumb({ blob, onRemove }: { blob: Blob; onRemove?: () => void }) {
+export function Thumb({ blob, onRemove }: { blob: Blob; onRemove?: () => void }) {
   const url = useObjectUrl(blob);
   return (
     <div className="thumb">
@@ -379,8 +381,8 @@ function Review({ id, go }: { id: string; go: Go }) {
         </p>
       )}
       <div className="actions">
-        <button className="primary" onClick={() => go({ name: "handoff", id })}>
-          Ready to list
+        <button className="primary" onClick={() => go({ name: "studio", id })}>
+          Next: photos
         </button>
       </div>
     </>
@@ -441,8 +443,8 @@ function Handoff({ id, go }: { id: string; go: Go }) {
   return (
     <>
       <header>
-        <button className="link" onClick={() => go({ name: "review", id })}>
-          ‹ Review
+        <button className="link" onClick={() => go({ name: "studio", id })}>
+          ‹ Studio
         </button>
         <h1>List it</h1>
       </header>
@@ -453,8 +455,8 @@ function Handoff({ id, go }: { id: string; go: Go }) {
           </button>
           {shared && <p className="hint">{shared}</p>}
           <div className="thumbs">
-            {orderedPhotos(item.photos).map((p) => (
-              <Thumb key={p.id} blob={p.blob} />
+            {listingPhotos(item.photos).map(({ photo, blob }) => (
+              <Thumb key={photo.id} blob={blob} />
             ))}
           </div>
         </li>

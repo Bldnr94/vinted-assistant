@@ -17,7 +17,12 @@ publish yourself.
    description, brand, category, size, colour, material, condition, defects, measurements to
    take and a rule-of-thumb price. Guessed fields are highlighted.
 3. **Review**: edit everything. "Compare on vinted.fr" opens a search for similar items.
-4. **List it**: save the photos in listing order, open Vinted, copy the title and
+4. **Studio**: front, back and detail shots can go on a clean light-grey studio background
+   with a soft shadow, cropped around the garment. The garment is cut out (Bria RMBG 2.0 on
+   fal.ai, about 0.018 USD a photo) and copied pixel for pixel, so colours and defects stay as
+   shot. Label and defect close-ups are never changed. If the cutout's colours differ from your
+   photo, the app keeps the original unless you choose otherwise.
+5. **List it**: save the photos in listing order, open Vinted, copy the title and
    description, tap the listed values into the form, press publish in Vinted.
 
 ## Setup (about 30 minutes, once)
@@ -41,6 +46,11 @@ You need: a GitHub account (this repo), an Anthropic API account, a free Cloudfl
      The app sends it with every draft so nobody else can spend your API credit.
    - Optional `MODEL`: `claude-sonnet-5-5` to halve the cost; default is `claude-opus-5-5`.
 4. Deploy. You get a URL like `https://vinted-assistant.pages.dev`.
+
+### 2b. fal.ai key (Studio photos)
+
+1. Sign up at https://fal.ai, add credit (5 USD lasts about 250 photos), and create an API key.
+2. In Cloudflare Pages, add it as the secret `FAL_KEY`, then redeploy.
 
 ### 3. Lock it to you (recommended)
 

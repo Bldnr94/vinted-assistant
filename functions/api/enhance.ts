@@ -7,6 +7,7 @@ import { checkRequest, isBase64Image, json, readJson, toDataUri } from "../../sh
 interface Env {
   APP_TOKEN: string;
   FAL_KEY: string;
+  FAL_BASE_URL?: string; // only for local tests against a mock
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -16,7 +17,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const body = await readJson<{ image?: unknown }>(request);
   if (!isBase64Image(body?.image)) return json({ error: "Send one JPEG photo as base64 in image." }, 400);
 
-  const res = await fetch("https://fal.run/fal-ai/bria/background/remove", {
+  const res = await fetch(`${env.FAL_BASE_URL || "https://fal.run"}/fal-ai/bria/background/remove`, {
     method: "POST",
     headers: { authorization: `Key ${env.FAL_KEY}`, "content-type": "application/json" },
     // sync_mode returns the result inline and keeps it out of fal's request history.
