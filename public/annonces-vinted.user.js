@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Annonces → Vinted
 // @namespace    https://github.com/Bldnr94/vinted-assistant
-// @version      1.0.5
+// @version      1.0.6
 // @description  Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.
 // @match        https://www.vinted.fr/*
 // @grant        GM.xmlHttpRequest
@@ -337,11 +337,12 @@
       if (reached < parts.length) {
         const leaf = parts[parts.length - 1];
         const box = findIn(SEARCH.category);
-        if (!box) return reached ? `stopped after "${parts[reached - 1]}"` : `stopped at "${parts[0]}"`;
-        await typeInto(box, leaf);
-        await pause(900, 1400);
-        const opt = await waitFor(() => bestOption(leaf, w.fresh), 3000);
-        if (!opt) return `no category matched "${leaf}"`;
+        const opt = box && (await searchCategory(box, leaf, w.fresh));
+        if (!opt) {
+          // Clears the failed search so the list shows categories again.
+          if (box) setValue(box, "");
+          return waitForOwnPick(input, leaf);
+        }
         pick(opt);
         await pause(600, 1000);
       }
@@ -354,6 +355,40 @@
     } finally {
       w.stop();
     }
+  }
+
+  // Types the leaf into the category search and takes the one result naming it, also as
+  // part of a longer name ("Bombers" finds "Vestes bombers") or in the singular.
+  async function searchCategory(box, leaf, fresh) {
+    await typeInto(box, leaf);
+    await pause(900, 1400);
+    const best = await waitFor(() => bestOption(leaf, fresh), 4000);
+    if (best) return best;
+    const words = norm(leaf)
+      .split(/[\s/,()-]+/)
+      .filter((x) => x.length > 2)
+      .map((x) => x.replace(/s$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (!words.length) return null;
+    const hit = (t) => t.length < 60 && words.every((x) => new RegExp(`(^|[^a-z])${x}s?([^a-z]|$)`).test(t));
+    const rows = new Set();
+    for (const el of fresh) {
+      if (!el.isConnected || !visible(el) || insidePanel(el) || isForbidden(el)) continue;
+      if (el.children.length > 2 || !hit(norm(el.textContent))) continue;
+      rows.add(el.closest("li") || el);
+    }
+    return rows.size === 1 ? [...rows][0] : null;
+  }
+
+  // When the script can't find the category, Victor picks it in the open list and the
+  // other fields (brand, condition, colour...), which only appear after, still get filled.
+  async function waitForOwnPick(input, leaf) {
+    const row = log(`✋ Catégorie: no match for "${leaf}". Pick it yourself in the list (minimise this panel if it's in the way); I'll carry on once it's set.`, "warn");
+    const picked = await waitFor(() => norm((find("category") || input).value), 120000, 500);
+    row.remove();
+    if (!picked) return `no category matched "${leaf}", and none was picked within 2 minutes`;
+    await pause(800, 1200);
+    if (Array.from(document.querySelectorAll(PICKER_DONE)).some(visible)) await closeDropdown(input);
+    return `ok, picked by you: ${(find("category") || input).value} (the app said "${leaf}")`;
   }
 
   // Picks options in a list-type dropdown. `pick(texts)` gets the visible option texts and
