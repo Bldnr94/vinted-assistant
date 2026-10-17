@@ -156,7 +156,7 @@ function Settings({ go }: { go: Go }) {
       </label>
       <p className="hint">The same value as APP_TOKEN in Cloudflare. It stays on this phone.</p>
       <label>
-        Studio cutout
+        Background cutout
         <select value={engine} onChange={(e) => setEngine(e.target.value as CutoutEngine)}>
           <option value="phone">On this phone (free)</option>
           <option value="fal">fal.ai (cleaner edges, about 0.018 USD a photo)</option>
@@ -204,7 +204,14 @@ function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
       ...cur,
       photos: cur.photos.map((p) =>
         p.id === photoId
-          ? { ...p, useFixed: !p.useFixed, improved: undefined, useImproved: undefined, colourShift: undefined }
+          ? {
+              ...p,
+              useFixed: !p.useFixed,
+              cutout: undefined,
+              improved: undefined,
+              useImproved: undefined,
+              colourShift: undefined,
+            }
           : p,
       ),
     }));

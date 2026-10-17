@@ -100,6 +100,7 @@ label.inline input { width: auto; margin: 0; }
 h2.or { font-size: 15px; color: var(--muted); margin: 20px 0 8px; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
 .chip { padding: 6px 12px; font-size: 14px; border-radius: 999px; }
+label.inline-file { display: inline; margin: 0; font-weight: 600; }
 .chip.on { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
 .drops { background: var(--warn-bg); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
 .drops h2 { font-size: 16px; margin: 0 0 4px; color: var(--warn); }

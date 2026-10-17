@@ -78,7 +78,7 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
     <>
       <header>
         <button className="link" onClick={() => go({ name: "studio", id })}>
-          ‹ Studio
+          ‹ Background
         </button>
         <h1>On model</h1>
       </header>

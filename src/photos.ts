@@ -2,6 +2,7 @@
 // studio background; the garment's own pixels are copied unchanged so defects and
 // colours stay exactly as shot.
 import { AI_NOTICE, SHOT_ORDER, type DraftImage, type ShotKind } from "../shared/listing";
+import { drawCover } from "./backdrop";
 import type { Photo } from "./db";
 
 const MAX_SIDE = 1600;
@@ -80,11 +81,20 @@ export function photoFiles(photos: Photo[], baseName: string): File[] {
   );
 }
 
-// Puts a cutout (transparent PNG from /api/enhance) on a light studio background with
-// a soft shadow, cropped around the garment at 3:4. Returns the JPEG and how much the
-// garment's colours differ from the original photo (should be close to 0).
-export async function composeStudio(original: Blob, cutout: Blob): Promise<{ jpeg: Blob; colourShift: number }> {
-  const [orig, cut] = await Promise.all([createImageBitmap(original), createImageBitmap(cutout)]);
+// Lays a cutout (transparent PNG of the garment) on a background, with the soft shadows
+// a garment casts when it lies flat: a tight contact shadow and a wide ambient one. The
+// garment's pixels are drawn once, unchanged. Returns the 3:4 JPEG and how much the
+// cutout's colours differ from the photo (should be close to 0).
+export async function composeStudio(
+  original: Blob,
+  cutout: Blob,
+  backdrop: Blob | null,
+): Promise<{ jpeg: Blob; colourShift: number }> {
+  const [orig, cut, back] = await Promise.all([
+    createImageBitmap(original),
+    createImageBitmap(cutout),
+    backdrop ? createImageBitmap(backdrop) : null,
+  ]);
   const w = orig.width;
   const h = orig.height;
 
@@ -119,29 +129,44 @@ export async function composeStudio(original: Blob, cutout: Blob): Promise<{ jpe
   }
   if (x1 <= x0 || y1 <= y0) throw new Error("No garment found in this photo.");
 
-  // Crop: garment plus a 10% margin, widened to a 3:4 frame.
+  // Frame: 3:4, sized so the garment fills about 80% of it without being enlarged.
   const gw = x1 - x0, gh = y1 - y0;
-  let cw = gw * 1.2, ch = gh * 1.2;
-  if (cw / ch > 3 / 4) ch = (cw * 4) / 3;
-  else cw = (ch * 3) / 4;
-  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  const scale = Math.min(1, MAX_SIDE / ch);
-
+  const frameH = Math.min(MAX_SIDE, Math.max(gh / 0.8, ((gw / 0.78) * 4) / 3));
+  const frameW = (frameH * 3) / 4;
+  const scale = Math.min(1, (0.78 * frameW) / gw, (0.8 * frameH) / gh);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(cw * scale);
-  canvas.height = Math.round(ch * scale);
+  canvas.width = Math.round(frameW);
+  canvas.height = Math.round(frameH);
   const ctx = canvas.getContext("2d")!;
-  const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  bg.addColorStop(0, "#f6f6f4");
-  bg.addColorStop(1, "#e8e8e5");
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.shadowColor = "rgba(0, 0, 0, 0.22)";
-  ctx.shadowBlur = 28 * scale;
-  ctx.shadowOffsetY = 10 * scale;
-  ctx.drawImage(cut, -(cx - cw / 2) * scale, -(cy - ch / 2) * scale, w * scale, h * scale);
-  ctx.restore();
+  if (back) {
+    drawCover(ctx, back, canvas.width, canvas.height);
+    back.close();
+  } else {
+    const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    bg.addColorStop(0, "#f6f6f4");
+    bg.addColorStop(1, "#e8e8e5");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // Garment centred, a touch above the middle; shadows are cast from far off-canvas so
+  // only the shadow lands and the garment itself is drawn exactly once.
+  const dx = canvas.width / 2 - ((x0 + x1) / 2) * scale;
+  const dy = canvas.height * 0.49 - ((y0 + y1) / 2) * scale;
+  const k = canvas.height / MAX_SIDE;
+  const off = canvas.width + w * scale + 100;
+  const shadow = (color: string, blur: number, ox: number, oy: number) => {
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = blur * k;
+    ctx.shadowOffsetX = off + ox * k;
+    ctx.shadowOffsetY = oy * k;
+    ctx.drawImage(cut, dx - off, dy, w * scale, h * scale);
+    ctx.restore();
+  };
+  shadow("rgba(40, 30, 20, 0.16)", 46, 8, 16);
+  shadow("rgba(30, 22, 14, 0.32)", 9, 2, 4);
+  ctx.drawImage(cut, dx, dy, w * scale, h * scale);
   orig.close();
   cut.close();
 
