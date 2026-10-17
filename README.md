@@ -13,14 +13,21 @@ publish yourself.
 ## How it works
 
 1. **Photos**: a shot checklist (front, back, brand label, size tag, care label, defects,
-   details), up to 20 photos.
+   details), up to 20 photos. Front, back and detail shots get a free automatic fix on the
+   phone: whites brought up to white and dim photos brightened (each capped), and the colour
+   cast of indoor light removed using only grey or white areas. The fix is one curve for the
+   whole photo, so nothing is redrawn and defects stay visible. Labels and defect close-ups
+   stay as shot, and a tap on "Auto-fixed ✓" goes back to the original.
 2. **Draft**: up to 10 photos go to Claude (labels and defects first), which returns title,
    description, brand, category, size, colour, material, condition, defects, measurements to
    take and a rule-of-thumb price. Guessed fields are highlighted.
 3. **Review**: edit everything. "Compare on vinted.fr" opens a search for similar items.
-4. **Studio**: front, back and detail shots can go on a clean light-grey studio background
-   with a soft shadow, cropped around the garment. The garment is cut out and copied pixel for
-   pixel, so colours and defects stay as shot. By default the cutout runs on your phone, free
+4. **Background**: front, back and detail shots are laid on a clean, natural background
+   (wood floor by default, white sheet, light wall, your own backdrop photo, or plain grey
+   studio) with a soft shadow, framed at 3:4. The built-in backgrounds are generated images in
+   `public/backdrops/`. "Your own" is one photo of an empty spot at home; it matches your light
+   best. Switching background is instant because the cutout is kept. The garment is cut out and
+   copied pixel for pixel, so colours and defects stay as shot. By default the cutout runs on your phone, free
    (IS-Net through `@imgly/background-removal`; the 88 MB model downloads once, from this app,
    on first use). In Settings you can switch to Bria RMBG 2.0 on fal.ai, which gives cleaner
    edges for about 0.018 USD a photo. Label and defect close-ups are never changed. If the cutout's colours differ from your
@@ -62,7 +69,7 @@ You need: a GitHub account (this repo), an Anthropic API account, a free Cloudfl
 
 ### 2b. fal.ai key (optional, Studio photos)
 
-Only if you switch Studio cutout to fal.ai in Settings.
+Only if you switch Background cutout to fal.ai in Settings.
 
 1. Sign up at https://fal.ai, add credit (the 10 USD minimum lasts about 550 photos), and create an API key.
 2. In Cloudflare Pages, add it as the secret `FAL_KEY`, then redeploy.

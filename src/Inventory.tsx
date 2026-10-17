@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Thumb, useItem, type Go } from "./App";
 import { draftLabel, enqueue, useQueueVersion } from "./batch";
 import { deleteItem, deleteSale, listItems, saveItem, saveSale, type Item, type ItemStatus } from "./db";
-import { orderedPhotos } from "./photos";
+import { basePhoto, orderedPhotos } from "./photos";
 import {
   daysSince,
   defaultFloor,
@@ -126,7 +126,7 @@ export function Inventory({ go }: { go: Go }) {
                 go(it.status !== "draft" ? { name: "item", id: it.id } : { name: it.draft ? "review" : "capture", id: it.id })
               }
             >
-              {it.photos[0] ? <Thumb blob={orderedPhotos(it.photos)[0].blob} /> : <div className="thumb empty" />}
+              {it.photos[0] ? <Thumb blob={basePhoto(orderedPhotos(it.photos)[0])} /> : <div className="thumb empty" />}
               <span>
                 <strong>{it.draft?.title || "Untitled item"}</strong>
                 <small>{subtitle(it)}</small>
@@ -175,7 +175,7 @@ function DropRow(props: { item: Item; days: number; suggested: number; settings:
   return (
     <div className="drop">
       <button className="item" onClick={() => go({ name: "item", id: item.id })}>
-        {item.photos[0] ? <Thumb blob={orderedPhotos(item.photos)[0].blob} /> : <div className="thumb empty" />}
+        {item.photos[0] ? <Thumb blob={basePhoto(orderedPhotos(item.photos)[0])} /> : <div className="thumb empty" />}
         <span>
           <strong>{item.draft?.title || "Untitled item"}</strong>
           <small>
@@ -249,7 +249,7 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
         {orderedPhotos(item.photos)
           .slice(0, 4)
           .map((p) => (
-            <Thumb key={p.id} blob={p.blob} />
+            <Thumb key={p.id} blob={basePhoto(p)} />
           ))}
       </div>
       <h2 className="item-title">{d?.title || "Untitled item"}</h2>
