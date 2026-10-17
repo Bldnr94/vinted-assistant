@@ -8,6 +8,8 @@ export interface Photo {
   kind: ShotKind | "ai_model";
   blob: Blob; // resized JPEG as shot, or the AI image
   addedAt: number;
+  fixed?: Blob; // same photo with capped automatic exposure and colour-cast correction
+  useFixed?: boolean;
   improved?: Blob; // same photo on a studio background, garment pixels unchanged
   useImproved?: boolean;
   colourShift?: number; // 0-255 average channel difference measured on the garment

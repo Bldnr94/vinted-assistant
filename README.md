@@ -13,7 +13,11 @@ publish yourself.
 ## How it works
 
 1. **Photos**: a shot checklist (front, back, brand label, size tag, care label, defects,
-   details), up to 20 photos.
+   details), up to 20 photos. Front, back and detail shots get a free automatic fix on the
+   phone: whites brought up to white and dim photos brightened (each capped), and the colour
+   cast of indoor light removed using only grey or white areas. The fix is one curve for the
+   whole photo, so nothing is redrawn and defects stay visible. Labels and defect close-ups
+   stay as shot, and a tap on "Auto-fixed ✓" goes back to the original.
 2. **Draft**: up to 10 photos go to Claude (labels and defects first), which returns title,
    description, brand, category, size, colour, material, condition, defects, measurements to
    take and a rule-of-thumb price. Guessed fields are highlighted.

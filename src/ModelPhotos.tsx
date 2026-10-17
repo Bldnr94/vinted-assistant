@@ -6,10 +6,10 @@ import { AI_NOTICE, MAX_PHOTOS } from "../shared/listing";
 import { errorText, postJson } from "./api";
 import { useItem, type Go } from "./App";
 import { listPoses, type ModelPose, type Photo } from "./db";
-import { dataUriToBlob, IMPROVABLE, resizeToJpeg, toBase64 } from "./photos";
+import { basePhoto, dataUriToBlob, IMPROVABLE, resizeToJpeg, toBase64 } from "./photos";
 import "./model.css";
 
-const garmentBlob = (p: Photo) => (p.useImproved && p.improved ? p.improved : p.blob);
+const garmentBlob = (p: Photo) => (p.useImproved && p.improved ? p.improved : basePhoto(p));
 
 function Img({ blob }: { blob: Blob }) {
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);

@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { Photo } from "./db";
 import { Thumb, readToken, useItem, type Go } from "./App";
 import { cutout, readEngine } from "./cutout";
-import { IMPROVABLE, composeStudio } from "./photos";
+import { IMPROVABLE, basePhoto, composeStudio } from "./photos";
 
 // Average channel difference (0-255) above which the cutout no longer matches the photo.
 const MAX_COLOUR_SHIFT = 6;
@@ -14,8 +14,9 @@ async function improve(
   photo: Photo,
   onProgress: (message: string) => void,
 ): Promise<Pick<Photo, "improved" | "colourShift" | "useImproved">> {
-  const cut = await cutout(photo.blob, readEngine(), readToken(), onProgress);
-  const { jpeg, colourShift } = await composeStudio(photo.blob, cut);
+  const base = basePhoto(photo);
+  const cut = await cutout(base, readEngine(), readToken(), onProgress);
+  const { jpeg, colourShift } = await composeStudio(base, cut);
   return { improved: jpeg, colourShift, useImproved: colourShift <= MAX_COLOUR_SHIFT };
 }
 
@@ -59,8 +60,8 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         <h1>Studio</h1>
       </header>
       <p className="hint">
-        Front, back and detail shots go on a clean studio background. The garment itself is copied exactly as shot,
-        so colours and defects don't change.
+        Front, back and detail shots go on a clean studio background. The garment itself is copied pixel for pixel from
+        your photo, so colours and defects don't change.
       </p>
       {todo.length > 0 && (
         <button className="primary" disabled={!!busy} onClick={() => run(todo)}>
@@ -73,8 +74,8 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         <section key={p.id} className="studio-row">
           <div className="pair">
             <figure>
-              <Thumb blob={p.blob} />
-              <figcaption>As shot</figcaption>
+              <Thumb blob={basePhoto(p)} />
+              <figcaption>{p.useFixed && p.fixed ? "Auto-fixed" : "As shot"}</figcaption>
             </figure>
             <figure>
               {p.improved ? <Thumb blob={p.improved} /> : <div className="thumb empty" />}

@@ -7,9 +7,9 @@ import {
   type Draft,
   type ShotKind,
 } from "../shared/listing";
-import { deleteItem, getItem, listItems, newItem, saveItem, type Item } from "./db";
+import { deleteItem, getItem, listItems, newItem, saveItem, type Item, type Photo } from "./db";
 import { VintedSend } from "./VintedSend";
-import { listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg } from "./photos";
+import { IMPROVABLE, autoFix, listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg } from "./photos";
 import { readEngine, saveEngine, type CutoutEngine } from "./cutout";
 import { Studio } from "./Studio";
 import { ModelPhotos } from "./ModelPhotos";
@@ -187,17 +187,27 @@ function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
   const add = async (kind: ShotKind, files: FileList | null) => {
     if (!files?.length) return;
     const photos = await Promise.all(
-      Array.from(files).map(async (f, i) => ({
-        id: crypto.randomUUID(),
-        kind,
-        blob: await resizeToJpeg(f),
-        addedAt: Date.now() + i,
-      })),
+      Array.from(files).map(async (f, i): Promise<Photo> => {
+        const blob = await resizeToJpeg(f);
+        // Whole-garment shots get the automatic exposure and colour fix; labels and defects stay as shot.
+        const fixed = IMPROVABLE.includes(kind) ? await autoFix(blob).catch(() => null) : null;
+        return { id: crypto.randomUUID(), kind, blob, addedAt: Date.now() + i, ...(fixed && { fixed, useFixed: true }) };
+      }),
     );
     await update((cur) => ({ ...cur, photos: [...cur.photos, ...photos].slice(0, MAX_PHOTOS) }));
   };
   const remove = (photoId: string) =>
     update((cur) => ({ ...cur, photos: cur.photos.filter((p) => p.id !== photoId) }));
+  // Switching between the fix and the original drops any studio version made from the other one.
+  const toggleFix = (photoId: string) =>
+    update((cur) => ({
+      ...cur,
+      photos: cur.photos.map((p) =>
+        p.id === photoId
+          ? { ...p, useFixed: !p.useFixed, improved: undefined, useImproved: undefined, colourShift: undefined }
+          : p,
+      ),
+    }));
 
   const missing = SHOTS.filter((s) => s.required && !item.photos.some((p) => p.kind === s.kind));
 
@@ -270,9 +280,18 @@ function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
             </div>
             {shots.length > 0 && (
               <div className="thumbs">
-                {shots.map((p) => (
-                  <Thumb key={p.id} blob={p.blob} onRemove={() => remove(p.id)} />
-                ))}
+                {shots.map((p) =>
+                  p.fixed ? (
+                    <figure key={p.id} className="fix">
+                      <Thumb blob={p.useFixed ? p.fixed : p.blob} onRemove={() => remove(p.id)} />
+                      <button className="link" onClick={() => toggleFix(p.id)}>
+                        {p.useFixed ? "Auto-fixed ✓" : "Original"}
+                      </button>
+                    </figure>
+                  ) : (
+                    <Thumb key={p.id} blob={p.blob} onRemove={() => remove(p.id)} />
+                  ),
+                )}
               </div>
             )}
           </section>
@@ -287,6 +306,12 @@ function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
           onChange={(e) => update((cur) => ({ ...cur, notes: e.target.value }))}
         />
       </label>
+      {item.photos.some((p) => p.fixed) && (
+        <p className="hint">
+          Front, back and detail photos get an automatic light and colour fix. Nothing is redrawn. Tap "Auto-fixed ✓"
+          to use the original instead.
+        </p>
+      )}
       {missing.length > 0 && <p className="hint">Still missing: {missing.map((m) => m.label).join(", ")}.</p>}
       {error && <p className="error">{error}</p>}
       {batch && <BatchStatus />}

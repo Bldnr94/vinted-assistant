@@ -78,6 +78,8 @@ input, textarea, select {
 .thumb { position: relative; width: 72px; height: 72px; border-radius: 8px; overflow: hidden; background: var(--card); flex: none; }
 .thumb img { width: 100%; height: 100%; object-fit: cover; }
 .thumb.empty { border: 1px dashed var(--line); }
+.fix { margin: 0; display: flex; flex-direction: column; align-items: center; }
+.fix .link { font-size: 12px; padding: 4px 0 0; }
 .remove { position: absolute; top: 2px; right: 2px; padding: 0 7px; font-size: 16px; line-height: 22px; border-radius: 50%; background: rgba(0, 0, 0, 0.6); color: #fff; border: none; }
 .steps { padding-left: 22px; }
 .steps > li { margin-bottom: 20px; }
