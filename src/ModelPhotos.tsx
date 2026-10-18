@@ -6,10 +6,19 @@ import { AI_NOTICE, MAX_PHOTOS } from "../shared/listing";
 import { errorText, postJson } from "./api";
 import { useItem, type Go } from "./App";
 import { listPoses, type ModelPose, type Photo } from "./db";
-import { basePhoto, dataUriToBlob, IMPROVABLE, resizeToJpeg, toBase64 } from "./photos";
+import { basePhoto, dataUriToBlob, IMPROVABLE, resizeToJpeg, stampAi, toBase64 } from "./photos";
 import "./model.css";
 
 const garmentBlob = (p: Photo) => (p.useImproved && p.improved ? p.improved : basePhoto(p));
+
+const STAMP_KEY = "ai-stamp";
+function readStamp(): boolean {
+  try {
+    return localStorage.getItem(STAMP_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
 
 function Img({ blob }: { blob: Blob }) {
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);
@@ -24,6 +33,7 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [stamp, setStamp] = useState(readStamp);
   useEffect(() => {
     listPoses().then(setPoses);
   }, []);
@@ -53,7 +63,8 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
             model: await toBase64(pose.blob),
             prompt: prompt.trim(),
           });
-          return resizeToJpeg(await dataUriToBlob(image));
+          const jpeg = await resizeToJpeg(await dataUriToBlob(image));
+          return stamp ? stampAi(jpeg) : jpeg;
         }),
       );
       const now = Date.now();
@@ -117,6 +128,21 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
               placeholder="e.g. jacket open, shirt tucked in"
               onChange={(e) => setPrompt(e.target.value)}
             />
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={stamp}
+              onChange={(e) => {
+                setStamp(e.target.checked);
+                try {
+                  localStorage.setItem(STAMP_KEY, e.target.checked ? "on" : "off");
+                } catch {
+                  // Only remembers the choice; the box still works.
+                }
+              }}
+            />
+            Mark new photos “Illustration IA”
           </label>
           <div className="actions">
             <button className="primary" disabled={busy || !garment} onClick={generate}>

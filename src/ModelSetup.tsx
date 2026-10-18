@@ -1,7 +1,7 @@
 // Your AI model: one body, created once, in up to 3 poses. Every try-on reuses
 // these exact photos, so the body, outfit base and room stay the same on every
-// listing. Photos are framed from the chin down and look like a phone photo at
-// home, like a private seller's own "worn" shots, not a catalogue.
+// listing. No face shows (framed from the chin down, or hidden by the phone in a
+// mirror selfie), and photos look like a private seller's own shots at home.
 import { useEffect, useMemo, useState } from "react";
 import { errorText, postJson } from "./api";
 import { deletePose, listPoses, savePose, type ModelPose } from "./db";
@@ -16,7 +16,21 @@ const COST_TRY = "about 0.45 USD";
 const LOOK =
   "Casual smartphone photo taken at home by a friend, not a professional shoot: standing in front of a plain off-white wall in a bright apartment, wooden floor, soft natural window light, slightly imperfect framing, no studio lights, no retouching. Framed from the chin down to the shoes: the face and head are out of frame, not visible.";
 
+// Mirror selfie in a bedroom, the style many Vinted sellers use. The phone hides the face.
+const MIRROR =
+  "Realistic amateur smartphone mirror selfie in a bright bedroom, as posted by a private seller on Vinted: full-length floor mirror with a thin black frame, white walls, warm honey-coloured wooden floor, round jute rug, a bed with white linen at the side, a beige armchair, soft natural daylight, slightly warm tones, a little phone-camera grain, not a professional shoot, no retouching. The phone held up in one hand covers the face completely. Whole body from head to shoes visible in the mirror. No bag, no jewellery.";
+
 const PRESETS: { label: string; prompt: string }[] = [
+  {
+    label: "Mirror selfie, woman",
+    prompt:
+      `A slim woman with long brown hair, wearing a plain fitted white t-shirt, straight light blue jeans and plain white sneakers. ${MIRROR}`,
+  },
+  {
+    label: "Mirror selfie, man",
+    prompt:
+      `A man of average build with short hair, wearing a plain fitted white t-shirt, straight dark grey jeans and plain white sneakers. ${MIRROR}`,
+  },
   {
     label: "Woman",
     prompt:
@@ -34,6 +48,14 @@ const POSES = [
   "Slight three-quarter turn to the left, weight on one leg, one hand in a pocket.",
   "Relaxed stance, hands loosely together in front, slight bend in one knee.",
 ];
+
+const MIRROR_POSES = [
+  "Standing straight facing the mirror, phone in front of the face, other arm relaxed at the side.",
+  "Slight turn to the side, weight on one leg, phone in front of the face, free hand on the hip.",
+  "Facing the mirror, one foot slightly forward, phone in front of the face, free hand in a pocket.",
+];
+
+const posesFor = (text: string) => (/mirror selfie/i.test(text) ? MIRROR_POSES : POSES);
 
 const PROMPT_KEY = "model-prompt-v2"; // v1 held the studio-style prompt
 const readPrompt = () => {
@@ -53,7 +75,7 @@ function PoseImage({ blob }: { blob: Blob }) {
 export function ModelSetup({ onBack }: { onBack: () => void }) {
   const [poses, setPoses] = useState<ModelPose[]>();
   const [person, setPerson] = useState(readPrompt);
-  const [pose, setPose] = useState(POSES[0]);
+  const [pose, setPose] = useState(() => posesFor(readPrompt())[0]);
   const [candidates, setCandidates] = useState<{ uri: string; base: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -62,9 +84,10 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
   useEffect(() => {
     reload();
   }, []);
+  const list = posesFor(poses?.[0]?.prompt || person);
   useEffect(() => {
-    if (poses?.length) setPose(POSES[Math.min(poses.length, POSES.length - 1)]);
-  }, [poses?.length]);
+    setPose(list[Math.min(poses?.length ?? 0, list.length - 1)]);
+  }, [poses?.length, list]);
 
   if (!poses) return null;
   const first = poses[0];
@@ -110,7 +133,7 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
       </header>
       <p className="hint">
         Create one model once. Each garment is then put on these same photos, so every listing shows the same body,
-        pose and room, framed from the chin down like a photo taken at home. Each pose gives one AI photo per item
+        pose and room, with no face, like a seller's own photo at home. Each pose gives one AI photo per item
         (about 0.23 USD each).
       </p>
 
@@ -183,7 +206,7 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
             </label>
           </div>
           <p className="hint">
-            {COST_TRY} per try. "Use my own photo": a photo of yourself (or someone who agreed) from the chin down,
+            {COST_TRY} per try. "Use my own photo": a mirror selfie in your own room with the phone hiding your face, or a photo from the chin down,
             against a plain wall, in a plain fitted t-shirt and trousers. Free.
           </p>
           {candidates.length > 0 && (
