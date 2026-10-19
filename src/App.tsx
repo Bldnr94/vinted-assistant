@@ -17,6 +17,7 @@ import { ModelSetup } from "./ModelSetup";
 import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
 import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
 import { Replies, ReplySettingsFields } from "./Replies";
+import { CATEGORY_PATHS } from "../shared/vinted-catalog";
 
 export type Screen =
   | { name: "home" }
@@ -403,7 +404,12 @@ function Review({ id, go }: { id: string; go: Go }) {
       </div>
       <label className={unsure("category_path")}>
         Catégorie
-        <input value={d.category_path} onChange={(e) => set({ category_path: e.target.value })} />
+        <input list="vinted-categories" value={d.category_path} onChange={(e) => set({ category_path: e.target.value })} />
+        <datalist id="vinted-categories">
+          {CATEGORY_PATHS.map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
       </label>
       <div className="grid">
         <label className={unsure("condition")}>

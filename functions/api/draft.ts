@@ -13,6 +13,7 @@ import {
   type ShotKind,
 } from "../../shared/listing";
 import { checkRequest, json, readJson } from "../../shared/server";
+import { CATEGORY_PATHS, KNOWN_BRANDS, isCategoryLeaf, snapCategory, vintedBrand, vintedSize } from "../../shared/vinted-catalog";
 
 interface Env {
   ANTHROPIC_API_KEY: string;
@@ -43,11 +44,19 @@ Honesty rules, which matter more than making the item sound good:
 Field guidance:
 - title: under 60 characters, like "Veste en jean Levi's bleu clair taille M". Item type first, then brand, colour, size.
 - description: 3 to 6 short lines. Item and brand, size and fit if known, material, condition with any defects, and an invitation to ask for measurements. Do not repeat the title word for word.
-- category_path: vinted.fr category path, from the top-level gender or audience down to the item type, e.g. "Hommes > Vêtements > Sweats et pulls > Pulls".
+- category_path: copy one path exactly from the vinted.fr category list at the end. Pick the most specific one that fits; use a branch's "Autres" path only when nothing else does.
+- brand: when the label matches a brand in the known-brands list, use that exact spelling (e.g. "LEVI STRAUSS & CO" is "Levi's").
+- size: for women's clothing give the letter and the French size when the tag shows them, e.g. "M / 38"; for men's tops the letter only, e.g. "M"; for shoes the EU number, e.g. "42"; for jeans the waist and length as written, e.g. "W32 L32".
 - colours: one or two from the allowed list.
 - measurements_to_take: the 2 to 4 measurements a buyer would ask for this kind of item (e.g. "Largeur aisselle à aisselle", "Longueur dos").
 - Price in euros for vinted.fr, as rough rules of thumb, not market data: fast-fashion brands 3-10 EUR; mid-range high-street 8-25 EUR; premium or outdoor brands 20-35% of typical retail; designer items need the seller to check comparables. Lower by about a third for "Bon état", by half for "Satisfaisant", raise for "Neuf avec étiquette". Explain the reasoning in English in price_reasoning and say it is a rule-of-thumb estimate.
-- search_query: a short query the seller can paste into vinted.fr search to compare, e.g. "veste levis jean".`;
+- search_query: a short query the seller can paste into vinted.fr search to compare, e.g. "veste levis jean".
+
+vinted.fr categories (one per line):
+${CATEGORY_PATHS.join("\n")}
+
+Known brands, as vinted.fr spells them:
+${KNOWN_BRANDS.join(", ")}`;
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const denied = checkRequest(request, env as unknown as Record<string, unknown>, ["ANTHROPIC_API_KEY"]);
@@ -87,7 +96,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       // If a safety classifier declines, the API retries on its recommended fallback model.
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: SYSTEM,
+      // The category list makes the prompt long; caching it keeps repeat drafts cheap.
+      system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content }],
     });
   } catch (err) {
@@ -108,6 +118,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     return json({ error: "Claude returned something that is not JSON." }, 502);
   }
   if (!CONDITIONS.includes(draft.condition)) draft.condition = "Bon état";
+  // Keep only values vinted.fr's form knows; a path that matches nothing is flagged for review.
+  const category = snapCategory(draft.category_path);
+  if (category) draft.category_path = category;
+  if (!isCategoryLeaf(draft.category_path) && !draft.unsure_fields.includes("category_path")) {
+    draft.unsure_fields.push("category_path");
+  }
+  draft.brand = vintedBrand(draft.brand);
+  draft.size = vintedSize(draft.size, draft.category_path);
 
   const result: DraftResponse = {
     draft,
