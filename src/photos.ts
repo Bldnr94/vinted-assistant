@@ -268,3 +268,31 @@ export async function autoFix(photo: Blob): Promise<Blob | null> {
   ctx.putImageData(image, 0, 0);
   return canvasToJpeg(canvas);
 }
+
+// Writes a small "Illustration IA" tag in the bottom-left corner, so buyers see the photo is AI
+// before they read the description.
+export async function stampAi(blob: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  const size = Math.round(canvas.width * 0.045);
+  const pad = Math.round(size * 0.5);
+  const margin = Math.round(size * 0.8);
+  ctx.font = `600 ${size}px system-ui, -apple-system, sans-serif`;
+  const label = "Illustration IA";
+  const w = ctx.measureText(label).width + pad * 2;
+  const h = size + pad * 1.4;
+  const y = canvas.height - margin - h;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.beginPath();
+  ctx.roundRect(margin, y, w, h, h / 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffffff";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, margin + pad, y + h / 2);
+  return canvasToJpeg(canvas);
+}
