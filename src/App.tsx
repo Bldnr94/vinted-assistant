@@ -16,6 +16,7 @@ import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
 import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
 import { useGeminiVersion } from "./gemini";
 import { Replies, ReplySettingsFields } from "./Replies";
+import { BackupBanner, BackupSection } from "./BackupSection";
 import { CATEGORY_PATHS } from "../shared/vinted-catalog";
 
 export type Screen =
@@ -117,6 +118,7 @@ function Home({ go }: { go: Go }) {
           drafting.
         </p>
       )}
+      <BackupBanner go={go} />
       <div className="actions">
         <button className="primary big" onClick={() => start()}>
           New item
@@ -162,6 +164,7 @@ function Settings({ go }: { go: Go }) {
         <button onClick={() => go({ name: "model", back: { name: "settings" } })}>My model</button>
       </div>
       <ReplySettingsFields />
+      <BackupSection />
     </>
   );
 }

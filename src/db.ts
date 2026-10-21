@@ -143,3 +143,59 @@ export const listPoses = async (): Promise<ModelPose[]> =>
 export const savePose = (pose: ModelPose) => run(POSES, "readwrite", (s) => s.put(pose));
 
 export const deletePose = (id: string) => run(POSES, "readwrite", (s) => s.delete(id));
+
+// Photo fields from removed features (background cut-out, colour shift). Old records may still hold them.
+const LEGACY_PHOTO_FIELDS = ["cutout", "colourShift", "improvedBy"];
+
+export function stripLegacyPhotoFields(item: Item): Item {
+  if (!item.photos.some((p) => LEGACY_PHOTO_FIELDS.some((f) => f in p))) return item;
+  return {
+    ...item,
+    photos: item.photos.map((p) => {
+      const clean: Record<string, unknown> = { ...p };
+      for (const f of LEGACY_PHOTO_FIELDS) delete clean[f];
+      return clean as unknown as Photo;
+    }),
+  };
+}
+
+export interface Rows {
+  items: Item[];
+  sales: Sale[];
+  poses: ModelPose[];
+}
+
+// One transaction over all three stores: either everything is written or nothing changes.
+// Records are stored as given, so their updatedAt stays untouched (saveItem would stamp it).
+function writeAll(rows: Rows, clear: boolean): Promise<void> {
+  return open().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([ITEMS, SALES, POSES], "readwrite");
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error ?? new Error("The write was cancelled; nothing was changed."));
+        try {
+          const items = tx.objectStore(ITEMS);
+          const sales = tx.objectStore(SALES);
+          const poses = tx.objectStore(POSES);
+          if (clear) {
+            items.clear();
+            sales.clear();
+            poses.clear();
+          }
+          rows.items.forEach((r) => items.put(r));
+          rows.sales.forEach((r) => sales.put(r));
+          rows.poses.forEach((r) => poses.put(r));
+        } catch (e) {
+          // A record that cannot be stored throws here, after clear() was queued: without the abort
+          // the transaction would still commit and the old data would be gone.
+          tx.abort();
+          reject(e);
+        }
+      }),
+  );
+}
+
+export const putAllRaw = (rows: Rows) => writeAll(rows, false);
+export const replaceAll = (rows: Rows) => writeAll(rows, true);

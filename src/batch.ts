@@ -15,6 +15,18 @@ export async function requestDraft(item: Item): Promise<DraftResponse> {
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((fn) => fn());
 let running = false;
+let paused = false;
+
+// Used while a backup is restored: no new draft starts, and the one in flight finishes first.
+export async function pauseQueue() {
+  paused = true;
+  while (running) await new Promise((r) => setTimeout(r, 200));
+}
+
+export function unpauseQueue() {
+  paused = false;
+  void runQueue();
+}
 
 // Re-reads the item before every write so photos or notes added meanwhile are kept.
 async function patch(id: string, fn: (cur: Item) => Item) {
@@ -29,14 +41,14 @@ export async function enqueue(id: string) {
 }
 
 async function runQueue() {
-  if (running) return;
+  if (running || paused) return;
   running = true;
   try {
     for (;;) {
       const next = (await listItems())
         .filter((i) => i.draftState === "queued" && i.photos.length > 0)
         .sort((a, b) => a.createdAt - b.createdAt)[0];
-      if (!next) break;
+      if (!next || paused) break;
       await patch(next.id, (cur) => ({ ...cur, draftState: "drafting" }));
       try {
         const { draft, model, usage } = await requestDraft(next);
