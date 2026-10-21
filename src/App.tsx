@@ -16,6 +16,7 @@ import { ModelPhotos } from "./ModelPhotos";
 import { ModelSetup } from "./ModelSetup";
 import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
 import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
+import { useGeminiVersion } from "./gemini";
 import { Replies, ReplySettingsFields } from "./Replies";
 import { CATEGORY_PATHS } from "../shared/vinted-catalog";
 
@@ -60,14 +61,16 @@ export type Go = (s: Screen) => void;
 export function useItem(id: string): [Item | undefined, (next: Item | ((cur: Item) => Item)) => Promise<void>] {
   const [item, setItem] = useState<Item>();
   const latest = useRef<Item>(undefined);
-  // Also reloads when the batch queue writes to items, so a background draft isn't overwritten.
+  // Also reloads when the batch queue writes to items, so a background draft isn't overwritten,
+  // and when the Mac extension writes a Gemini-automated "on model" photo straight to IndexedDB.
   const queue = useQueueVersion();
+  const gemini = useGeminiVersion();
   useEffect(() => {
     getItem(id).then((i) => {
       latest.current = i;
       setItem(i);
     });
-  }, [id, queue]);
+  }, [id, queue, gemini]);
   const update = async (next: Item | ((cur: Item) => Item)) => {
     const value = typeof next === "function" ? next(latest.current!) : next;
     latest.current = value;

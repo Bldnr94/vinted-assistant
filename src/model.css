@@ -1,5 +1,5 @@
 /* AI model setup and the "On your model" section. Uses the tokens from styles.css. */
-h2 { font-size: 17px; margin: 20px 0 8px; }
+h2 { font-size: 17px; margin: 20px 0 8px; text-wrap: balance; }
 h2 em { font-style: normal; font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
 .model-photos { border-top: 1px solid var(--line); margin-top: 20px; }
 .poses, .ai-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 10px 0; }

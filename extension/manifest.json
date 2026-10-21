@@ -15,10 +15,21 @@
       "matches": ["https://www.vinted.fr/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://gemini.google.com/*"],
+      "js": ["gemini-content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.pages.dev/*"],
+      "js": ["bridge-content.js"],
+      "run_at": "document_idle"
     }
   ],
-  "permissions": [],
+  "permissions": ["storage", "tabs"],
   "host_permissions": [
-    "https://*.pages.dev/*"
+    "https://*.pages.dev/*",
+    "https://gemini.google.com/*"
   ]
 }

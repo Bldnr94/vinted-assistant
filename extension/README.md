@@ -10,6 +10,33 @@ downloads the listing JSON from your own Cloudflare Pages site, and fills in the
 form's fields and photos at a human pace. It never presses publish — you always press the
 real "Ajouter" button yourself.
 
+## Gemini automation (optional, experimental)
+
+The app's "On model" screen has an "Automate with Gemini (Mac, this browser)" button next to
+the manual Gemini steps. With this extension loaded, it opens (or focuses) a
+`gemini.google.com` tab, uploads the garment + pose photos, types the prompt, waits for
+Gemini's generated image, and feeds it back into the app as a new AI photo — no manual
+share/copy/import needed.
+
+This is new, unverified territory: Gemini's web app markup was never inspected live before
+building `gemini-content.js` (the selectors are best-effort guesses, flagged in code). If
+Gemini has changed its page, or the guesses are simply wrong, the automation fails safely —
+it reports a clear error back to the app and never leaves anything half-done — and the
+existing manual "Send model + garment to Gemini" / "Import Gemini result" steps keep working
+exactly as before, with no dependency on this feature.
+
+Three files work together, each a separate content script/worker:
+- `bridge-content.js` — runs on your Cloudflare Pages app's own domain, reads the garment and
+  pose photos straight out of the app's IndexedDB, and writes the finished AI photo back into
+  it once Gemini is done.
+- `gemini-content.js` — runs on `gemini.google.com`, drives its chat UI, and captures the
+  result image.
+- `background.js` — relays the job between the two tabs via `chrome.storage.local` (no server
+  round-trip; nothing about this leaves your own browser).
+
+If it stops working after a Gemini redesign, use the manual steps underneath the button —
+they're unaffected.
+
 ## Loading it
 
 1. Open `chrome://extensions` in Chrome.

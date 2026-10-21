@@ -6,6 +6,7 @@ import { AI_NOTICE, MAX_PHOTOS } from "../shared/listing";
 import { errorText, postJson } from "./api";
 import { useItem, type Go } from "./App";
 import { listPoses, type ModelPose, type Photo } from "./db";
+import { requestGeminiAutomation } from "./gemini";
 import { basePhoto, dataUriToBlob, IMPROVABLE, resizeToJpeg, toBase64 } from "./photos";
 import "./model.css";
 
@@ -40,8 +41,25 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
   const [error, setError] = useState("");
   const [geminiPose, setGeminiPose] = useState(0);
   const [geminiNote, setGeminiNote] = useState("");
+  const [geminiAutoStatus, setGeminiAutoStatus] = useState("");
   useEffect(() => {
     listPoses().then(setPoses);
+  }, []);
+  // Status from the Mac extension's Gemini automation (extension/bridge-content.js). "done"
+  // needs no message here: the new photo already appeared via useGeminiVersion()'s refetch.
+  useEffect(() => {
+    const onStatus = (e: Event) => {
+      const detail = (e as CustomEvent<{ status: string; error?: string }>).detail;
+      if (!detail) return;
+      if (detail.status === "started") setGeminiAutoStatus("Automating via Gemini… check the new browser tab.");
+      else if (detail.status === "done") setGeminiAutoStatus("");
+      else if (detail.status === "failed") {
+        setGeminiAutoStatus("");
+        setError(detail.error || "Gemini automation failed. Use the manual steps below instead.");
+      }
+    };
+    window.addEventListener("va:gemini-status", onStatus);
+    return () => window.removeEventListener("va:gemini-status", onStatus);
   }, []);
 
   if (!item || !poses) return null;
@@ -84,6 +102,17 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  // Mac only: asks the Vinted Assistant Chrome extension to run the Gemini step itself, in a
+  // new browser tab, using the same prompt and photos as the manual route below. No-op if the
+  // extension isn't installed (requestGeminiAutomation just dispatches an event nobody catches).
+  const automateWithGemini = () => {
+    const pose = poses?.[geminiPose] ?? poses?.[0];
+    if (!pose || !garment) return;
+    setError("");
+    setGeminiAutoStatus("Asking the extension to start…");
+    requestGeminiAutomation(item.id, garment.id, pose.id, GEMINI_PROMPT(prompt.trim()));
   };
 
   // Gemini route, step 1: hand the model photo and the garment to the Gemini app (share sheet, or download).
@@ -214,6 +243,14 @@ export function ModelPhotos({ id, go }: { id: string; go: Go }) {
                 ))}
               </div>
             )}
+            <p className="hint">
+              On a Mac with the Vinted Assistant Chrome extension installed, this can run itself:
+            </p>
+            <button onClick={automateWithGemini} disabled={!garment || !!geminiAutoStatus}>
+              Automate with Gemini (Mac, this browser)
+            </button>
+            {geminiAutoStatus && <p className="hint">{geminiAutoStatus}</p>}
+            <p className="hint">Or do it by hand:</p>
             <ol className="steps">
               <li>
                 <button onClick={sendToGemini} disabled={!garment}>
