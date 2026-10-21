@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Thumb, useItem, type Go } from "./App";
 import { draftLabel, enqueue, useQueueVersion } from "./batch";
 import { deleteItem, deleteSale, listItems, saveItem, saveSale, type Item, type ItemStatus } from "./db";
+import { dateFr, euros } from "./format";
 import { basePhoto, orderedPhotos } from "./photos";
 import {
   daysSince,
@@ -20,8 +21,6 @@ import {
 
 const STATUS_LABEL: Record<ItemStatus, string> = { draft: "Drafts", live: "Live", sold: "Sold" };
 const FILTER_KEY = "inventory-filter";
-const euros = (n: number | undefined) => (n === undefined ? "?" : `${n} €`);
-const dateFr = (t: number) => new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
 export function markedLive(item: Item, price: number, now = Date.now()): Item {
   return {

@@ -7,7 +7,7 @@ import {
   type Draft,
   type ShotKind,
 } from "../shared/listing";
-import { deleteItem, getItem, listItems, newItem, saveItem, type Item, type Photo } from "./db";
+import { cleanLegacyFields, deleteItem, getItem, listItems, newItem, saveItem, type Item, type Photo } from "./db";
 import { VintedSend } from "./VintedSend";
 import { IMPROVABLE, autoFix, listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg } from "./photos";
 import { Studio } from "./Studio";
@@ -36,9 +36,17 @@ export function readToken(): string {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: "home" });
-  useEffect(() => void resumeQueue(), []);
+  const [blocked, setBlocked] = useState(false);
+  useEffect(() => {
+    void cleanLegacyFields().catch(() => {}); // best effort; it retries at the next start
+    void resumeQueue();
+    const onBlocked = () => setBlocked(true);
+    window.addEventListener("va:db-blocked", onBlocked);
+    return () => window.removeEventListener("va:db-blocked", onBlocked);
+  }, []);
   return (
     <main>
+      {blocked && <p className="warn">Another tab of this app is open. Close it, then reload this page.</p>}
       {screen.name === "home" && <Home go={setScreen} />}
       {screen.name === "settings" && <Settings go={setScreen} />}
       {screen.name === "capture" && <Capture key={screen.id} id={screen.id} batch={screen.batch} go={setScreen} />}

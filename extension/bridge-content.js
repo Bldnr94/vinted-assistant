@@ -15,26 +15,25 @@
 // There is no way to `import` src/db.ts from here; this file is loaded as a flat <script>,
 // same as the existing extension/content.js. So the handful of IndexedDB operations actually
 // needed (get an item, get a model-pose, put an updated item) are reimplemented inline below,
-// matching src/db.ts's schema exactly (same DB name/version, store names, key paths).
+// matching src/db.ts's schema (same DB name, store names, key paths; the version is not pinned).
 
 (function () {
   "use strict";
 
   const DB_NAME = "vinted-assistant";
-  const DB_VERSION = 3;
   const ITEMS = "items";
   const POSES = "model-poses";
 
-  // Opens the existing database without creating it and without touching its schema. This
-  // content script never runs before the PWA itself has opened the DB at least once, so the
-  // stores already exist; onupgradeneeded here is a no-op safety net, not a schema owner.
+  // Opens the app's existing database without a version number, so it always gets whatever
+  // version the app has migrated to (a pinned version would fail after the app's next schema bump).
+  // onupgradeneeded only fires when the database does not exist yet, meaning the app never ran on
+  // this origin: abort so no empty database is left behind.
   function openDb() {
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      const req = indexedDB.open(DB_NAME);
       req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(ITEMS)) db.createObjectStore(ITEMS, { keyPath: "id" });
-        if (!db.objectStoreNames.contains(POSES)) db.createObjectStore(POSES, { keyPath: "id" });
+        req.transaction.abort();
+        reject(new Error("Open the app once before using the Gemini automation."));
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);

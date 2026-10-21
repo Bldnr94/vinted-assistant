@@ -4,8 +4,8 @@ import type { Go } from "./App";
 import { hasRoomFor, lastBackupAt, localRows, parseBackup, restoreBackup, saveBackup, type ParsedBackup } from "./backup";
 import { pauseQueue, unpauseQueue } from "./batch";
 import { listItems } from "./db";
+import { dateLong as longDate } from "./format";
 
-const longDate = (t: number) => new Date(t).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
 const counts = (r: { items: unknown[]; sales: unknown[]; poses: unknown[] }) =>
   `${r.items.length} items, ${r.sales.length} sales, ${r.poses.length} model photos`;
 

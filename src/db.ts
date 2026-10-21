@@ -41,6 +41,8 @@ export interface Item {
   snoozedUntil?: number; // no price-drop reminder before this time
   soldAt?: number;
   soldPrice?: number;
+  costPrice?: number; // what you paid for it, in euros
+  sourcedAt?: number; // when you bought it
   draftState?: "queued" | "drafting" | "failed"; // batch mode's background drafting queue
   draftError?: string;
 }
@@ -58,6 +60,11 @@ export interface Sale {
   soldPrice: number;
   listedAt: number;
   soldAt: number;
+  costPrice?: number; // what you paid for the item
+  sourcedAt?: number;
+  shippingCost?: number; // shipping you paid yourself
+  otherFees?: number; // any other cost of this sale
+  paidAt?: number; // when the money reached you; soldAt when absent
 }
 
 export interface ModelPose {
@@ -72,9 +79,19 @@ const ITEMS = "items";
 const POSES = "model-poses";
 const SALES = "sales";
 
+// One shared connection. Another tab that needs a newer database version asks us to let go
+// (versionchange): we close and reload so it is not left waiting forever.
+let connection: Promise<IDBDatabase> | undefined;
+
 function open(): Promise<IDBDatabase> {
+  connection ??= connect();
+  return connection;
+}
+
+function connect(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, 3);
+    req.onblocked = () => window.dispatchEvent(new Event("va:db-blocked"));
     req.onupgradeneeded = (e) => {
       const db = req.result;
       if (!db.objectStoreNames.contains(ITEMS)) db.createObjectStore(ITEMS, { keyPath: "id" });
@@ -103,8 +120,22 @@ function open(): Promise<IDBDatabase> {
         };
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => {
+      const db = req.result;
+      db.onversionchange = () => {
+        db.close();
+        connection = undefined;
+        location.reload();
+      };
+      db.onclose = () => {
+        connection = undefined; // the browser dropped it (for example after site data was cleared)
+      };
+      resolve(db);
+    };
+    req.onerror = () => {
+      connection = undefined;
+      reject(req.error);
+    };
   });
 }
 
@@ -157,6 +188,39 @@ export function stripLegacyPhotoFields(item: Item): Item {
       return clean as unknown as Photo;
     }),
   };
+}
+
+// Once per device, drops the removed features' photo fields. A cursor updates each record inside the
+// transaction, so an item saved at the same moment is never overwritten with a stale copy.
+const LEGACY_CLEANED_KEY = "legacy-fields-cleaned";
+
+export async function cleanLegacyFields(): Promise<void> {
+  try {
+    if (localStorage.getItem(LEGACY_CLEANED_KEY)) return;
+  } catch {
+    // blocked storage: the pass is harmless to repeat
+  }
+  const db = await open();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(ITEMS, "readwrite");
+    const cursor = tx.objectStore(ITEMS).openCursor();
+    cursor.onsuccess = () => {
+      const c = cursor.result;
+      if (!c) return;
+      const item = c.value as Item;
+      const clean = stripLegacyPhotoFields(item);
+      if (clean !== item) c.update(clean);
+      c.continue();
+    };
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error ?? new Error("Cleanup cancelled."));
+  });
+  try {
+    localStorage.setItem(LEGACY_CLEANED_KEY, "1");
+  } catch {
+    // blocked storage: it simply runs again next start
+  }
 }
 
 export interface Rows {
