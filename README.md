@@ -39,8 +39,7 @@ publish yourself.
 5. **On model** (optional): the garment goes on your own AI model (FASHN Try-On Max), one
    photo per saved pose, about 0.23 USD each. You create the model once in
    Settings → AI model, in up to 3 poses, so every listing shows the same body and room (no face, casual phone-photo look; the default preset is a
-   mirror selfie in a bedroom with the phone hiding the face). New AI photos get a small
-   "Illustration IA" tag in the corner unless you untick it.
+   mirror selfie in a bedroom with the phone hiding the face).
    No FASHN? "Or use the Gemini app" on the same screen copies a prompt and shares the model
    photo and the garment to the Gemini app; you import Gemini's result back. Free with a Google
    AI plan, but done by hand and less faithful, so check colour, print and logo closely.
