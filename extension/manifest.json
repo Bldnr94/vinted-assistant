@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Annonces → Vinted",
+  "version": "1.0.6",
+  "description": "Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.",
+  "icons": {
+    "192": "icons/icon-192.png",
+    "512": "icons/icon-512.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.vinted.fr/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": [],
+  "host_permissions": [
+    "https://*.pages.dev/*"
+  ]
+}

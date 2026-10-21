@@ -8,7 +8,7 @@ import {
   saveReplySettings,
   type ItemWithMeasures,
   type ReplySettings,
-} from "./replies";
+} from "./replyLogic";
 
 export function Replies({ id, go }: { id: string; go: Go }) {
   const [item, update] = useItem(id);

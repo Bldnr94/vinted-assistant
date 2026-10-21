@@ -171,6 +171,18 @@ paste the copied text into the project thread; the field rules at the top of
 fixes from the GitHub address on their own; to get one straight away, use **Check for
 updates** in Tampermonkey or reinstall from the same address.
 
+### 5b. On a Mac, in desktop Chrome (optional, no userscript manager needed)
+
+`extension/` is an unpacked Chrome extension that does the same thing as the Annonces
+userscript above — same panel, same "Fill the form" button, same rule that it never presses
+publish. Load it once in `chrome://extensions` (Developer mode → Load unpacked → pick the
+`extension/` folder); see `extension/README.md` for the full steps, how to update it after a
+`git pull`, and a note for anyone using a custom domain instead of `*.pages.dev`.
+
+The app itself (the PWA at steps 1–4) needs no changes to run in a desktop browser: open the
+same Cloudflare Pages URL in Chrome or Safari on the Mac, sign in through Access if you set
+it up, and use the file picker instead of the phone's camera when adding photos.
+
 ## Testing the MVP
 
 List 3 real items end to end and note, for each:
