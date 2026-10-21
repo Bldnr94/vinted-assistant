@@ -10,6 +10,8 @@ export interface ThresholdSpec {
   unit: "eur" | "count";
   limit: number | null; // null: not verified, shown as unknown
   inclusive?: boolean; // true when reaching the limit already counts (otherwise it has to be exceeded)
+  note?: string; // how the official rule measures it, shown under the figure
+  sourceUrl?: string;
 }
 
 export type ThresholdStatus = "below" | "near" | "over" | "unknown";
