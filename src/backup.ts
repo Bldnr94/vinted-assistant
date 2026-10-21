@@ -13,6 +13,7 @@ import {
   type Rows,
   type Sale,
 } from "./db";
+import { download } from "./download";
 import { openZip, zipBlobs, type ZipEntry } from "./zip";
 
 export const SCHEMA_VERSION = 3; // the IndexedDB version the data was exported from
@@ -280,15 +281,6 @@ function markBackedUp() {
 }
 
 export type SaveResult = "saved" | "cancelled";
-
-function download(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
 
 // On a phone the share sheet puts the file in Files, iCloud or a message; on a computer it downloads.
 export async function saveBackup(): Promise<SaveResult> {
