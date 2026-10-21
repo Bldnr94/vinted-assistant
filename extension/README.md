@@ -18,21 +18,34 @@ the manual Gemini steps. With this extension loaded, it opens (or focuses) a
 Gemini's generated image, and feeds it back into the app as a new AI photo — no manual
 share/copy/import needed.
 
-This is new, unverified territory: Gemini's web app markup was never inspected live before
-building `gemini-content.js` (the selectors are best-effort guesses, flagged in code). If
-Gemini has changed its page, or the guesses are simply wrong, the automation fails safely —
-it reports a clear error back to the app and never leaves anything half-done — and the
-existing manual "Send model + garment to Gemini" / "Import Gemini result" steps keep working
-exactly as before, with no dependency on this feature.
+What it does on Gemini, in order: reloads Gemini onto a fresh chat, switches on the "Create
+image" tool (without it Gemini refuses), attaches the model photo then the garment photo
+(the prompt calls them image 1 and image 2), types the prompt, sends, waits for the generated
+image, then clicks Gemini's own "Download full-sized image" button to capture the full-size
+file (falls back to the on-screen preview if that fails). A side effect: Gemini's download
+button also saves a copy of the image in your Downloads folder; the app uses the captured
+copy, so you can delete those files.
 
-Three files work together, each a separate content script/worker:
+The selectors were checked against the live Gemini page in October 2026, but Gemini is an
+Angular app whose markup changes without notice. If a step can't find its element, the
+automation stops with a clear error shown in the panel on the Gemini tab and in the app, and
+the existing manual "Send model + garment to Gemini" / "Import Gemini result" steps keep
+working exactly as before, with no dependency on this feature. The panel's last line tells
+you which step failed.
+
+Files that work together:
 - `bridge-content.js` — runs on your Cloudflare Pages app's own domain, reads the garment and
   pose photos straight out of the app's IndexedDB, and writes the finished AI photo back into
   it once Gemini is done.
 - `gemini-content.js` — runs on `gemini.google.com`, drives its chat UI, and captures the
   result image.
-- `background.js` — relays the job between the two tabs via `chrome.storage.local` (no server
+- `gemini-main.js` — runs in Gemini's own page context so it can see the page's network
+  requests; it forwards the full-size image Gemini fetches for the download button.
+- `background.js` — relays the job between the tabs via `chrome.storage.local` (no server
   round-trip; nothing about this leaves your own browser).
+
+After pulling an update, reload the extension in `chrome://extensions` and reload the app's
+tab, since content scripts are injected when a page loads.
 
 If it stops working after a Gemini redesign, use the manual steps underneath the button —
 they're unaffected.

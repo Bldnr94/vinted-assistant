@@ -1,68 +1,59 @@
 // Annonces → Vinted — Gemini automation content script
 //
-// Drives the Gemini web app (https://gemini.google.com/*) to reproduce, by hand-equivalent
-// clicks and keystrokes, the manual flow described in src/ModelPhotos.tsx's Gemini fallback:
-// upload the garment photo + a pose photo, type a prompt, wait for the generated image, and
-// hand it back. This exists so the user doesn't have to do that by hand every time — Gemini's
-// API costs money, but the free Google AI plan covers the web UI the user is already logged
-// into.
+// Drives the Gemini web app (https://gemini.google.com/*) to reproduce, step by step, the
+// manual flow in src/ModelPhotos.tsx: attach the model photo and the garment photo, switch on
+// Gemini's "Create image" tool, send the prompt, wait for the generated image, and hand it
+// back. Gemini's API costs money, but the free Google AI plan covers the web UI the user is
+// already logged into.
 //
 // Shares the "relay contract" with extension/bridge-content.js (running on the *.pages.dev
-// app tab) via chrome.storage.local key "geminiJob" and a few chrome.runtime message types
-// handled in background.js. This file only ever touches:
-//   - the chrome.storage.local job object (read via GEMINI_JOB_POLL, write the result via
-//     GEMINI_JOB_RESULT — never written directly)
-//   - Gemini's own chat UI: the upload input, the message text box, and (if needed) a send
-//     button
-// It never clicks anything that deletes, shares, exports, or signs out, and never navigates
-// away from the page.
+// app tab) via chrome.storage.local key "geminiJob" and the chrome.runtime messages handled
+// in background.js (GEMINI_JOB_POLL in, GEMINI_JOB_RESULT out). This file only ever touches
+// Gemini's composer: the "+" (Upload and tools) menu, the message box, the send button, and
+// the "Download full-sized image" button on the image it generated. It never clicks anything
+// that deletes, shares, exports, or signs out, and never navigates away.
 //
-// Gemini's DOM is unresearched territory: no prior session has automated it, so the selectors
-// below are best-effort guesses built the same defensive way content.js handles vinted.fr's
-// uncertain markup — an ordered list of candidates per target, with heuristic fallbacks. If
-// Gemini changes its markup (or the guesses are simply wrong), this fails safely: every step is
-// wrapped so a GEMINI_JOB_RESULT with an error is always sent, and the existing manual "import
-// Gemini result" file picker in the app remains the fallback path.
+// Selectors below were checked against the live Gemini page (Oct 2026). Gemini is an Angular
+// app whose markup changes without notice; when a step cannot find its element the run stops
+// with a clear error, and the manual "Send to Gemini" / "Import result" steps in the app still
+// work.
 
 (function () {
   "use strict";
 
   if (!/^https:\/\/gemini\.google\.com\//.test(location.href)) return;
 
-  // Ways to find each target, tried in order. None of these have been verified against a
-  // live gemini.google.com page — flagged "unverified, needs live testing" in the report back.
-  const FIELDS = {
-    // Gemini's chat composer accepts file uploads through a hidden <input type="file">,
-    // usually revealed by a "+"/paperclip toolbar button. We never click that toolbar button
-    // ourselves (too easy to mis-click something destructive); instead we look for the input
-    // directly, since hidden file inputs are normally present in the DOM even before the
-    // toolbar opens them.
-    fileInput: [
-      'input[type="file"][multiple]',
-      'input[type="file"]',
-    ],
-    // The chat text box. Gemini's composer is known (from public reporting) to use a
-    // contenteditable rich-text box rather than a <textarea>, but both are tried.
+  const SELECTORS = {
+    // "+" button in the composer. Gemini creates its <input type="file"> elements only once
+    // this menu has been opened, which is why they cannot be found on a fresh page.
+    toolsButton: ['button[aria-label="Upload and tools"]', 'button[aria-label*="Upload" i]'],
+    imageInput: ['input[type="file"][accept="image/*"]', 'input[type="file"][accept^="image"]', 'input[type="file"]'],
+    menuItem: "gem-list-item",
+    menuItemSelectedMark: ".gem-list-item-icon-selected",
+    // The composer is a Quill editor inside <rich-textarea>.
     textBox: [
-      'rich-textarea div[contenteditable="true"]',
+      'rich-textarea div.ql-editor[contenteditable="true"]',
       'div[contenteditable="true"][role="textbox"]',
-      'div[contenteditable="true"]',
+      'rich-textarea div[contenteditable="true"]',
       "textarea",
     ],
-    // A send button near the composer, used only if Enter doesn't submit.
-    sendButton: [
-      'button[aria-label*="Send" i]',
-      'button[aria-label*="Envoyer" i]',
-      'button[data-testid*="send" i]',
-    ],
+    sendButton: ['button[aria-label="Send message"]', 'button[aria-label*="Send" i]', 'button[aria-label*="Envoyer" i]'],
+    attachment: "uploader-file-preview",
+    // Generated images live in the model's answer; the user's own attachments do not.
+    resultImage: ["model-response generated-image img", "model-response single-image img", 'model-response img[alt*="AI generated" i]'],
+    modelResponse: "model-response",
   };
 
-  // Text that must never be clicked — Gemini's own vocabulary for destructive/navigational
-  // actions, English and French (the user's Google account may be in either).
+  const CREATE_IMAGE = /create image|cr[ée]er une image/i;
+  const DOWNLOAD_FULL = /download|t[ée]l[ée]charger/i;
+  const MAX_SIDE = 1600; // same cap as resizeToJpeg() in src/photos.ts
+
+  // Text that must never be clicked: Gemini's own vocabulary for destructive or navigational
+  // actions, English and French.
   const FORBIDDEN_TEXT =
     /delete|remove|clear conversation|clear chat|share|export|settings|sign out|log out|supprimer|effacer|partager|exporter|param(e|è)tres|d(e|é)connexion/i;
 
-  // ---------- small helpers (ported near-verbatim from content.js) ----------
+  // ---------- small helpers ----------
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const pause = (min = 350, max = 900) => sleep(min + Math.random() * (max - min));
@@ -96,72 +87,28 @@
     });
   }
 
-  function isForbidden(el) {
-    const button = el.closest('button, [role="button"], a[href]');
-    if (button?.matches("a[href]")) {
-      const href = button.getAttribute("href") || "";
-      if (href && href !== "#" && !href.startsWith("javascript:")) return true;
-    }
-    if (button && FORBIDDEN_TEXT.test(button.textContent || "")) return true;
-    if (button && FORBIDDEN_TEXT.test(button.getAttribute("aria-label") || "")) return true;
-    return false;
+  // Refuses to click anything whose label suggests a destructive or navigating action.
+  function safeClick(el) {
+    const label = `${el.getAttribute("aria-label") || ""} ${el.textContent || ""}`;
+    if (FORBIDDEN_TEXT.test(label)) throw new Error(`refused to click "${label.trim().slice(0, 40)}"`);
+    const link = el.closest("a[href]");
+    if (link && link.getAttribute("href") && link.getAttribute("href") !== "#") throw new Error("refused to click a link");
+    el.click();
   }
 
-  // A tap, the way a finger produces it. Refuses forbidden elements and links. Ported from
-  // content.js's tap().
-  function tap(el) {
-    if (!el || isForbidden(el)) throw new Error("refused to click a forbidden element");
-    el.scrollIntoView({ block: "center" });
-    const r = el.getBoundingClientRect();
-    const opts = { bubbles: true, cancelable: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
-    const fire = (make) => {
-      try {
-        el.dispatchEvent(make());
-      } catch {
-        // ignore unsupported event constructors
-      }
-    };
-    fire(() => new PointerEvent("pointerdown", { ...opts, pointerType: "mouse", isPrimary: true }));
-    fire(() => new MouseEvent("mousedown", opts));
-    fire(() => new PointerEvent("pointerup", { ...opts, pointerType: "mouse", isPrimary: true }));
-    fire(() => new MouseEvent("mouseup", opts));
-    if (typeof el.click === "function") el.click();
-    else fire(() => new MouseEvent("click", opts));
-  }
+  const closeMenu = () =>
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", keyCode: 27, bubbles: true }));
 
-  // Sets a <textarea>/<input>'s value via the native setter so a React-bound listener notices.
-  function setValue(el, value) {
-    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
-  }
+  // ---------- full-size image capture (see gemini-main.js) ----------
 
-  // Types a value a few characters at a time, at a human pace. Handles both a plain
-  // textarea/input (native setter trick) and a contenteditable box (textContent + input event),
-  // since Gemini's composer is most likely contenteditable.
-  async function typeInto(el, value) {
-    el.scrollIntoView({ block: "center" });
-    el.focus();
-    tap(el);
-    const isEditable = el.isContentEditable;
-    if (isEditable) el.textContent = "";
-    else setValue(el, "");
-    const text = String(value);
-    let i = 0;
-    while (i < text.length) {
-      i = Math.min(text.length, i + 2 + Math.floor(Math.random() * 5));
-      const slice = text.slice(0, i);
-      if (isEditable) {
-        el.textContent = slice;
-        el.dispatchEvent(new InputEvent("input", { bubbles: true, data: slice }));
-      } else {
-        setValue(el, slice);
-      }
-      await sleep(25 + Math.random() * 60);
-    }
-    el.dispatchEvent(new Event("change", { bubbles: true }));
-    await pause(150, 350);
-  }
+  // gemini-main.js runs in the page's own world and posts every large Google-hosted image it
+  // sees being fetched; the one the "Download full-sized image" button fetches is the real image.
+  const captured = [];
+  window.addEventListener("message", (e) => {
+    const d = e.data;
+    if (e.source !== window || !d || d.source !== "va-gemini-main" || !(d.blob instanceof Blob)) return;
+    captured.push({ blob: d.blob, at: Date.now() });
+  });
 
   // ---------- panel (shadow-DOM, same technique and CSS vars as content.js's buildPanel) ----------
 
@@ -179,16 +126,15 @@
 
   function buildPanel() {
     host = document.createElement("div");
-    host.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;";
+    host.style.cssText = "position:fixed;left:8px;right:8px;bottom:8px;z-index:2147483647;pointer-events:none;";
     const shadow = host.attachShadow({ mode: "closed" });
     shadow.innerHTML = `
       <style>
-        .box{font:14px/1.35 system-ui,-apple-system,sans-serif;background:#fff;color:#1c1f22;border:1px solid #0b7a75;
+        .box{pointer-events:auto;font:14px/1.35 system-ui,-apple-system,sans-serif;background:#fff;color:#1c1f22;border:1px solid #0b7a75;
              border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.25);padding:10px 12px;max-width:520px;margin:0 auto}
         .head{display:flex;align-items:center;gap:8px}
         .head b{flex:1;color:#0b7a75}
         button{font:inherit;font-size:15px;padding:8px 12px;border-radius:10px;border:1px solid #dde1e4;background:#f5f7f8;color:inherit}
-        button:disabled{opacity:.5}
         ul{list-style:none;margin:8px 0 0;padding:0;max-height:34vh;overflow:auto}
         li{padding:2px 0}
         .ok{color:#0b6b3a}.warn{color:#8a5a00}
@@ -198,9 +144,7 @@
       </style>
       <div class="box">
         <div class="head"><b>Annonces — Gemini</b><button class="toggle" aria-label="Minimise">–</button></div>
-        <div class="body">
-          <ul></ul>
-        </div>
+        <div class="body"><ul></ul></div>
       </div>`;
     const box = shadow.querySelector(".box");
     ui.list = shadow.querySelector("ul");
@@ -211,123 +155,158 @@
     document.documentElement.appendChild(host);
   }
 
-  // ---------- the job ----------
+  // ---------- the steps ----------
 
   function fileFromBase64(b64, name) {
+    if (typeof b64 !== "string" || !b64) throw new Error(`no photo data for ${name}`);
     const bin = atob(b64);
     const bytes = new Uint8Array(bin.length);
     for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j);
     return new File([bytes], name, { type: "image/jpeg" });
   }
 
-  async function uploadPhotos(garmentFile, poseFile) {
-    const input = await waitFor(() => findIn(FIELDS.fileInput), 15000);
-    if (!input) throw new Error("could not find Gemini's upload input");
+  async function openToolsMenu() {
+    const btn = await waitFor(() => findIn(SELECTORS.toolsButton), 20000);
+    if (!btn) throw new Error('could not find Gemini\'s "+" (Upload and tools) button');
+    safeClick(btn);
+    await pause(700, 1100);
+  }
+
+  const findMenuItem = (re) => Array.from(document.querySelectorAll(SELECTORS.menuItem)).find((e) => re.test(e.textContent || "")) || null;
+
+  // "Create image" is a toggle. Without it Gemini answers "I don't have access to that content".
+  async function selectCreateImage() {
+    await openToolsMenu();
+    const item = await waitFor(() => findMenuItem(CREATE_IMAGE), 6000);
+    if (!item) {
+      closeMenu();
+      throw new Error('could not find the "Create image" tool in Gemini\'s menu');
+    }
+    if (item.querySelector(SELECTORS.menuItemSelectedMark)) {
+      closeMenu(); // already on
+    } else {
+      safeClick(item.querySelector("mat-list-item") || item);
+    }
+    await pause(600, 1000);
+  }
+
+  // Attaches the photos in order (the prompt says image 1 is the person, image 2 the garment).
+  async function uploadPhotos(files) {
+    await openToolsMenu();
+    const input = await waitFor(() => findIn(SELECTORS.imageInput), 8000);
+    if (!input) {
+      closeMenu();
+      throw new Error("could not find Gemini's upload input, even after opening the + menu");
+    }
     const dt = new DataTransfer();
-    dt.items.add(garmentFile);
-    dt.items.add(poseFile);
+    files.forEach((f) => dt.items.add(f));
     input.files = dt.files;
     input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
-    // Give Gemini time to show the attached-image thumbnails before we type/submit.
-    await pause(1500, 2500);
+    const attached = await waitFor(() => document.querySelectorAll(SELECTORS.attachment).length >= files.length, 30000, 300);
+    if (!attached) throw new Error("Gemini did not attach the photos");
+    closeMenu();
+    await pause(1200, 1800);
   }
 
-  async function submitPrompt(prompt) {
-    const box = await waitFor(() => findIn(FIELDS.textBox), 10000);
-    if (!box) throw new Error("could not find Gemini's chat text box");
-    await typeInto(box, prompt);
-    await pause(300, 600);
-    // Enter submits most chat UIs, including (per public reporting) Gemini's own composer,
-    // and needs no button-selector guess at all — try it first.
-    box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    box.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", bubbles: true, cancelable: true }));
-    await pause(800, 1200);
-    // If Enter didn't clear the box, Gemini likely didn't submit; fall back to a send button.
-    const stillFull = box.isContentEditable ? (box.textContent || "").trim().length > 0 : (box.value || "").trim().length > 0;
-    if (stillFull) {
-      const send = findIn(FIELDS.sendButton);
-      if (send) tap(send);
+  async function writePrompt(prompt) {
+    const box = await waitFor(() => findIn(SELECTORS.textBox), 10000);
+    if (!box) throw new Error("could not find Gemini's message box");
+    box.focus();
+    await pause(200, 400);
+    if (box.isContentEditable) {
+      // Gemini's Quill editor only reacts to real editing commands, not to textContent changes.
+      document.execCommand("selectAll");
+      document.execCommand("delete");
+      for (let i = 0; i < prompt.length; i += 60) {
+        document.execCommand("insertText", false, prompt.slice(i, i + 60));
+        await sleep(30 + Math.random() * 50);
+      }
+      if (!(box.textContent || "").trim()) throw new Error("the prompt did not register in Gemini's message box");
+    } else {
+      const proto = box instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      Object.getOwnPropertyDescriptor(proto, "value").set.call(box, prompt);
+      box.dispatchEvent(new Event("input", { bubbles: true }));
     }
+    await pause(400, 800);
+    return box;
   }
 
-  // Watches for a freshly-added <img> in the response area, preferring new elements over any
-  // pre-existing image on the page (e.g. an avatar). Ported from content.js's watchAdded().
-  function watchAdded() {
-    const fresh = new Set();
-    const obs = new MutationObserver((muts) => {
-      for (const m of muts)
-        for (const n of m.addedNodes)
-          if (n.nodeType === 1) {
-            fresh.add(n);
-            n.querySelectorAll?.("img").forEach((c) => fresh.add(c));
-            if (n.tagName === "IMG") fresh.add(n);
-          }
-    });
-    obs.observe(document.body, { childList: true, subtree: true });
-    return { fresh, stop: () => obs.disconnect() };
+  async function send(box) {
+    const btn = await waitFor(() => {
+      const b = findIn(SELECTORS.sendButton);
+      return b && !b.disabled && b.getAttribute("aria-disabled") !== "true" ? b : null;
+    }, 30000, 300);
+    if (btn) safeClick(btn);
+    else box.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, bubbles: true, cancelable: true }));
   }
+
+  const lastResultImage = () => {
+    const imgs = Array.from(document.querySelectorAll(SELECTORS.resultImage.join(","))).filter(
+      (i) => !insidePanel(i) && i.complete && i.naturalWidth > 256,
+    );
+    return imgs[imgs.length - 1] || null;
+  };
 
   async function waitForResultImage() {
-    const w = watchAdded();
-    try {
-      // Generous timeout: image generation is slow.
-      const img = await waitFor(
-        () => {
-          for (const el of w.fresh) {
-            if (el.tagName === "IMG" && el.isConnected && visible(el) && !insidePanel(el) && el.naturalWidth > 32) return el;
-          }
-          return null;
-        },
-        90000,
-        400,
-      );
-      return img;
-    } finally {
-      w.stop();
-    }
+    const img = await waitFor(lastResultImage, 150000, 1000);
+    if (img) return img;
+    const answers = document.querySelectorAll(SELECTORS.modelResponse);
+    const text = (answers[answers.length - 1]?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 160);
+    throw new Error(text ? `Gemini answered without an image: "${text}"` : "Gemini did not produce an image in time");
   }
 
-  async function extractImageBase64(img) {
-    // Primary: fetch the image's own src with credentials — runs in gemini.google.com's own
-    // origin, so this reuses the page's cookies and avoids any canvas taint issue.
-    try {
-      const res = await fetch(img.src, { credentials: "include" });
-      const blob = await res.blob();
-      return await blobToBase64(blob);
-    } catch {
-      // Fallback: draw the already-rendered <img> onto a canvas. This still works even if the
-      // fetch is blocked, unless the image is cross-origin without CORS headers (tainted
-      // canvas) — in which case toBlob() throws and we surface a clear error below.
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth || img.width;
-      canvas.height = img.naturalHeight || img.height;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0);
-      const blob = await new Promise((resolve, reject) => {
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("canvas produced no blob"))), "image/jpeg", 0.92);
-      });
-      return await blobToBase64(blob);
-    }
-  }
-
-  function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
+  const blobToBase64 = (blob) =>
+    new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
       reader.onerror = () => reject(new Error("could not read the generated image"));
       reader.readAsDataURL(blob);
     });
+
+  // Re-encodes to JPEG capped at MAX_SIDE, like the app does for every other photo.
+  async function toJpeg(source) {
+    const bitmap = source instanceof Blob ? await createImageBitmap(source) : null;
+    const w = bitmap ? bitmap.width : source.naturalWidth;
+    const h = bitmap ? bitmap.height : source.naturalHeight;
+    const scale = Math.min(1, MAX_SIDE / Math.max(w, h));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    canvas.getContext("2d").drawImage(bitmap || source, 0, 0, canvas.width, canvas.height);
+    if (bitmap) bitmap.close();
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("could not encode the image"))), "image/jpeg", 0.92);
+    });
+  }
+
+  // Full size first: the download button makes the page fetch the real image, which
+  // gemini-main.js forwards. Falls back to the ~1024px preview on screen (canvas export works
+  // because the preview is a same-origin blob: URL; fetch() on it is blocked by Gemini's CSP).
+  async function captureImage(img) {
+    const area = img.closest("generated-image") || img.closest("single-image") || document;
+    const btn = Array.from(area.querySelectorAll("button")).find((b) => DOWNLOAD_FULL.test(b.getAttribute("aria-label") || ""));
+    if (btn) {
+      captured.length = 0;
+      // Gemini only shows this button while the image is hovered.
+      for (const type of ["mouseover", "mouseenter"]) area.dispatchEvent(new MouseEvent(type, { bubbles: true }));
+      btn.click();
+      const first = await waitFor(() => captured[0], 20000, 250);
+      if (first) {
+        await sleep(1500); // let a larger copy arrive if there is one
+        const biggest = captured.reduce((a, b) => (b.blob.size > a.blob.size ? b : a));
+        return { blob: await toJpeg(biggest.blob), how: "full size" };
+      }
+    }
+    return { blob: await toJpeg(img), how: "preview size" };
   }
 
   async function reportResult(payload) {
     try {
       await chrome.runtime.sendMessage({ type: "GEMINI_JOB_RESULT", ...payload });
     } catch {
-      // Nothing more we can do — background may be asleep or the message channel closed.
-      // The job is left as "running" in storage; a page reload will not re-pick it up
-      // (GEMINI_JOB_POLL only returns "pending" jobs), so the user falls back to the
-      // existing manual import flow.
+      // Background asleep or channel closed: nothing more to do. The app falls back to the
+      // manual import.
     }
   }
 
@@ -335,39 +314,30 @@
     buildPanel();
     log("Automating Gemini for this listing's model photo…");
     try {
-      log("Preparing photos…");
-      const garmentFile = fileFromBase64(job.garmentBase64, "garment.jpg");
-      const poseFile = fileFromBase64(job.poseBase64, "pose.jpg");
+      // Pose first, garment second: the prompt calls them "image 1" and "image 2".
+      const files = [fileFromBase64(job.poseBase64, "1-modele.jpg"), fileFromBase64(job.garmentBase64, "2-vetement.jpg")];
 
-      log("Uploading photos…");
-      await uploadPhotos(garmentFile, poseFile);
+      log('Switching on the "Create image" tool…');
+      await selectCreateImage();
 
-      log("Typing the prompt…");
-      await submitPrompt(job.prompt || "");
+      log("Attaching the photos…");
+      await uploadPhotos(files);
 
-      log("Waiting for Gemini to generate the image… this can take a while.");
+      log("Writing the prompt…");
+      const box = await writePrompt(job.prompt || "");
+
+      log("Sending. Gemini is generating the image, this can take a minute…");
+      await send(box);
+
       const img = await waitForResultImage();
-      if (!img) {
-        log("No image appeared in time.", "warn");
-        await reportResult({ error: "Gemini did not produce an image in time. Use the manual import instead." });
-        return;
-      }
 
-      log("Capturing the result…");
-      let resultBase64;
-      try {
-        resultBase64 = await extractImageBase64(img);
-      } catch {
-        log("Could not capture the generated image.", "warn");
-        await reportResult({ error: "Could not capture the generated image automatically. Use the manual import instead." });
-        return;
-      }
-
-      log("Done — sending the image back to the app.", "ok");
-      await reportResult({ resultBase64 });
+      log("Image ready, capturing it…");
+      const { blob, how } = await captureImage(img);
+      log(`Captured (${how}). Sending it back to the app.`, "ok");
+      await reportResult({ resultBase64: await blobToBase64(blob) });
     } catch (e) {
       log(`Failed: ${e.message || e}`, "warn");
-      await reportResult({ error: `Gemini automation failed: ${e.message || e}. Use the manual import instead.` });
+      await reportResult({ error: `Gemini automation failed: ${e.message || e}. Use the manual steps instead.` });
     }
   }
 
@@ -378,7 +348,7 @@
     try {
       job = await chrome.runtime.sendMessage({ type: "GEMINI_JOB_POLL" });
     } catch {
-      return; // background not reachable; nothing to do silently
+      return; // background not reachable; nothing to do
     }
     if (!job) return; // no pending job for this page load
     run(job);

@@ -45,7 +45,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   (async () => {
     if (message.type === "GEMINI_JOB_START") {
       const { geminiJob } = await chrome.storage.local.get("geminiJob");
-      if (geminiJob && (geminiJob.status === "pending" || geminiJob.status === "running")) {
+      // A job left "pending"/"running" for more than 5 minutes is stale (tab closed mid-run,
+      // browser restarted): replace it instead of blocking every future automation.
+      const stale = !geminiJob || !geminiJob.createdAt || Date.now() - geminiJob.createdAt > 5 * 60 * 1000;
+      if (geminiJob && (geminiJob.status === "pending" || geminiJob.status === "running") && !stale) {
         sendResponse({ ok: false, error: "An automation is already running." });
         return;
       }
@@ -54,6 +57,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       await chrome.storage.local.set({
         geminiJob: {
           status: "pending",
+          createdAt: Date.now(),
           itemId: job.itemId,
           garmentPhotoId: job.garmentPhotoId,
           poseId: job.poseId,
@@ -64,7 +68,9 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       });
       const tabs = await chrome.tabs.query({ url: "https://gemini.google.com/*" });
       if (tabs.length) {
-        await chrome.tabs.update(tabs[0].id, { active: true });
+        // Reload it onto a fresh chat: gemini-content.js only looks for a job when the page
+        // loads, so merely focusing an already-open Gemini tab would never start the job.
+        await chrome.tabs.update(tabs[0].id, { url: "https://gemini.google.com/app", active: true });
       } else {
         await chrome.tabs.create({ url: "https://gemini.google.com/app" });
       }
