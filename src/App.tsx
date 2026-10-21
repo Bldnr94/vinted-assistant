@@ -17,11 +17,14 @@ import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
 import { useGeminiVersion } from "./gemini";
 import { Replies, ReplySettingsFields } from "./Replies";
 import { BackupBanner, BackupSection } from "./BackupSection";
+import { BottomNav, TOP_LEVEL } from "./BottomNav";
+import { Pro } from "./ProScreen";
+import { Sales } from "./SalesScreen";
+import { Stats } from "./StatsScreen";
 import { CATEGORY_PATHS } from "../shared/vinted-catalog";
 
 export type Screen =
-  | { name: "home" }
-  | { name: "settings" }
+  | { name: "home" | "settings" | "sales" | "stats" | "pro" }
   | { name: "model"; back: Screen }
   | { name: "capture" | "review" | "studio" | "handoff" | "item" | "replies"; id: string; batch?: boolean };
 
@@ -45,10 +48,13 @@ export default function App() {
     return () => window.removeEventListener("va:db-blocked", onBlocked);
   }, []);
   return (
-    <main>
+    <main className={TOP_LEVEL.includes(screen.name) ? "with-nav" : undefined}>
       {blocked && <p className="warn">Another tab of this app is open. Close it, then reload this page.</p>}
       {screen.name === "home" && <Home go={setScreen} />}
       {screen.name === "settings" && <Settings go={setScreen} />}
+      {screen.name === "sales" && <Sales />}
+      {screen.name === "stats" && <Stats />}
+      {screen.name === "pro" && <Pro />}
       {screen.name === "capture" && <Capture key={screen.id} id={screen.id} batch={screen.batch} go={setScreen} />}
       {screen.name === "review" && <Review id={screen.id} go={setScreen} />}
       {screen.name === "studio" && <Studio id={screen.id} go={setScreen} />}
@@ -56,6 +62,7 @@ export default function App() {
       {screen.name === "handoff" && <Handoff id={screen.id} go={setScreen} />}
       {screen.name === "item" && <ItemPage id={screen.id} go={setScreen} />}
       {screen.name === "replies" && <Replies id={screen.id} go={setScreen} />}
+      {TOP_LEVEL.includes(screen.name) && <BottomNav screen={screen} go={setScreen} />}
     </main>
   );
 }
@@ -116,9 +123,6 @@ function Home({ go }: { go: Go }) {
     <>
       <header>
         <h1>Annonces</h1>
-        <button className="link" onClick={() => go({ name: "settings" })}>
-          Settings
-        </button>
       </header>
       {!readToken() && (
         <p className="warn">
@@ -143,31 +147,36 @@ function Home({ go }: { go: Go }) {
 
 function Settings({ go }: { go: Go }) {
   const [token, setToken] = useState(readToken);
+  const [saved, setSaved] = useState(false);
   const save = () => {
     try {
       localStorage.setItem(TOKEN_KEY, token.trim());
+      setSaved(true);
     } catch {
       alert("This browser blocked local storage, so the token could not be saved.");
     }
-    go({ name: "home" });
   };
   return (
     <>
       <header>
-        <button className="link" onClick={() => go({ name: "home" })}>
-          ‹ Back
-        </button>
         <h1>Settings</h1>
       </header>
       <label>
         App token
-        <input value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
+        <input
+          value={token}
+          onChange={(e) => {
+            setToken(e.target.value);
+            setSaved(false);
+          }}
+          autoComplete="off"
+        />
       </label>
       <p className="hint">The same value as APP_TOKEN in Cloudflare. It stays on this phone.</p>
       <DropSettingsFields />
       <div className="actions">
         <button className="primary" onClick={save}>
-          Save
+          {saved ? "Saved ✓" : "Save"}
         </button>
         <button onClick={() => go({ name: "model", back: { name: "settings" } })}>My model</button>
       </div>

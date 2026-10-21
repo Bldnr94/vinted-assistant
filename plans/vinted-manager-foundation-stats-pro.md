@@ -99,14 +99,14 @@ Depends: 5. Tasks:
 Verify: typecheck, build; 390px viewport and desktop: tabs switch, nav hides inside flows, last list row not covered.
 
 ## Step 7: Sales screen
-Depends: 4, 5, 6. Replace the `Sales` placeholder (`src/Sales.tsx` + `src/sales.css`):
+Depends: 4, 5, 6. Replace the `Sales` placeholder (`src/SalesScreen.tsx` + `src/sales.css`):
 - Sales newest first: title, sold date, sold price, profit or "cost missing".
 - Tap a row to edit cost, shipping, fees, sold price, paid date (writes `saveSale`; also updates the Item if it still exists, but cost only).
 - Filter: this month, this year, all; footer totals via `summarise`.
 Verify: three sales (one without cost): totals match hand computation.
 
 ## Step 8: Stats screen  **PUSH after this step**
-Depends: 5, 6. Replace the `Stats` placeholder (`src/Stats.tsx` + `src/stats.css`):
+Depends: 5, 6. Replace the `Stats` placeholder (`src/StatsScreen.tsx` + `src/stats.css`):
 - Range chips; cards for revenue, profit, margin, sold count, days to sell, sell-through.
 - Monthly bars (CSS or inline SVG, no chart library; one accent colour, labelled values, dark mode).
 - Aging stock with the 90+ bucket highlighted, linking to the price-drop flow.
@@ -127,7 +127,7 @@ Depends: 8, 9. Tasks:
 Verify: tests incl. year boundaries, exactly-at-threshold, `null` thresholds -> `unknown`, deleted-item sales included.
 
 ## Step 11: Pro screen + CSV export
-Depends: 6, 10. Replace the `Pro` placeholder (`src/Pro.tsx` + `src/pro.css`):
+Depends: 6, 10. Replace the `Pro` placeholder (`src/ProScreen.tsx` + `src/pro.css`):
 - Threshold cards with progress, status wording "below threshold / close / over" (never "not taxable"), the `asOf` date and source link, a warning when `asOf` is over 12 months old, and the fixed disclaimer "Information only, not tax advice; check with your accountant or the official site."
 - Year selector; **Receipts register (CSV)** and **Purchases register (CSV)**: UTF-8 with BOM, `;` separator, comma decimals, ISO dates, French header row, proper quoting; CSV serializer unit-tested (quotes, semicolons, line breaks in titles).
 Verify: open both files in Numbers/Excel (French locale): columns split, accents intact, amounts numeric.
@@ -137,7 +137,7 @@ Depends: 11. A "Receipt" action on a sold item opens a print view (seller detail
 Verify: print preview on desktop and iOS Safari: one clean page.
 
 ## Step 13: Docs and wrap-up  **PUSH after this step**
-README: "Data, backup and stats" and "Pro tools (France)" sections, link to this plan, updated Layout list (`zip.ts`, `backup.ts`, `format.ts`, `sales.ts`, `stats.ts`, `pro.ts`, `businessProfile.ts`, `proThresholds.ts`, `BottomNav.tsx`, `Sales.tsx`, `Stats.tsx`, `Pro.tsx`) and the "stays on your phone" line (plus the backup file); `extension/README.md`: unversioned IndexedDB open. Run all invariants plus a clean-profile smoke test (create item, mark sold with cost, view Stats, export, clear site data, import, Gemini job).
+README: "Data, backup and stats" and "Pro tools (France)" sections, link to this plan, updated Layout list (`zip.ts`, `backup.ts`, `format.ts`, `sales.ts`, `stats.ts`, `pro.ts`, `businessProfile.ts`, `proThresholds.ts`, `BottomNav.tsx`, `SalesScreen.tsx`, `StatsScreen.tsx`, `ProScreen.tsx`) and the "stays on your phone" line (plus the backup file); `extension/README.md`: unversioned IndexedDB open. Run all invariants plus a clean-profile smoke test (create item, mark sold with cost, view Stats, export, clear site data, import, Gemini job).
 Exit: documented, pushed, Cloudflare deploy green.
 
 ## Plan mutation protocol
@@ -150,4 +150,5 @@ Storing or exporting `app-token`; thresholds without source and date; guessing t
 - Rev 1 reviewed by a strongest-model sub-agent: 1 critical (in-memory zip + non-atomic Replace), 8 major (needless version bump, multi-tab upgrade hang, impossible rollback, double-cursor migration clobber, untestable bridge step, merge rules and timestamp stamping, false parallelism, unreusable formatters), ~15 minor. All incorporated above.
 
 ## Changes
-- (none yet)
+- 2026-10-21, step 6: screens renamed `SalesScreen.tsx`, `StatsScreen.tsx`, `ProScreen.tsx`. On macOS (case-insensitive) `./Stats` resolved to `stats.ts` and broke tsc, same trap as `replies.ts`. Never name a component file the same as a logic file apart from case (`pro.ts` vs `Pro.tsx`, etc.).
+- 2026-10-21, step 4: shipping/fees live on the Sale only, as planned; the Inventory list rows do not show profit (the item page and the Sales screen do).
