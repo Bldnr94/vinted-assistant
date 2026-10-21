@@ -53,7 +53,7 @@ export default function App() {
       {screen.name === "home" && <Home go={setScreen} />}
       {screen.name === "settings" && <Settings go={setScreen} />}
       {screen.name === "sales" && <Sales go={setScreen} />}
-      {screen.name === "stats" && <Stats />}
+      {screen.name === "stats" && <Stats go={setScreen} />}
       {screen.name === "pro" && <Pro />}
       {screen.name === "capture" && <Capture key={screen.id} id={screen.id} batch={screen.batch} go={setScreen} />}
       {screen.name === "review" && <Review id={screen.id} go={setScreen} />}

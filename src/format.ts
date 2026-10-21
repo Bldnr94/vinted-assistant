@@ -30,7 +30,13 @@ export function fromDateInput(s: string): number | undefined {
   return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : undefined;
 }
 
-export const yearOf =(t: number) => yearMonth(t).year;
+// "2026-10" -> "oct. 26", for chart labels.
+export const monthLabel = (key: string) => {
+  const [year, month] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, 15)).toLocaleDateString("fr-FR", { month: "short", year: "2-digit", timeZone: "UTC" });
+};
+
+export const yearOf = (t: number) => yearMonth(t).year;
 
 // "2026-04": the month a timestamp falls in, in Paris time.
 export const monthKey = (t: number) => {

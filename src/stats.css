@@ -1,0 +1,22 @@
+.stat-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 8px; }
+.stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: grid; gap: 2px; align-content: start; }
+.stat-card strong { font-size: 22px; }
+.stat-card small { color: var(--muted); font-size: 13px; text-wrap: pretty; }
+
+.month-bars, .age-list, .old-items { list-style: none; margin: 0; padding: 0; }
+.month-bars li { display: grid; grid-template-columns: 68px 1fr auto; align-items: center; gap: 10px; padding: 5px 0; }
+.month-bars .m { color: var(--muted); font-size: 14px; white-space: nowrap; }
+.month-bars .bar { height: 14px; border-radius: 4px; background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+.month-bars .bar i { display: block; height: 100%; background: var(--accent); min-width: 0; }
+.month-bars .v { font-size: 14px; text-align: right; white-space: nowrap; }
+.month-bars small, .age-list small { color: var(--muted); }
+
+.age-list li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--line); font-size: 15px; }
+.age-list li.old { background: var(--warn-bg); color: var(--warn); border-radius: 8px; border-bottom-color: transparent; font-weight: 600; }
+.age-list li.old small { color: inherit; font-weight: 400; }
+.old-items li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; }
+
+.top-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.top-table th { text-align: left; color: var(--muted); font-weight: 400; padding: 4px 6px 4px 0; }
+.top-table td { padding: 6px 6px 6px 0; border-top: 1px solid var(--line); }
+.top-table td:nth-child(n+2), .top-table th:nth-child(n+2) { text-align: right; }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateFr, dateLong, euros, fromDateInput, monthKey, round2, toDateInput, yearOf } from "./format";
+import { dateFr, dateLong, euros, fromDateInput, monthKey, monthLabel, round2, toDateInput, yearOf } from "./format";
 
 // Intl uses non-breaking spaces; compare with plain ones.
 const plain = (s: string) => s.replace(/[  ]/g, " ");
@@ -38,6 +38,13 @@ describe("date inputs", () => {
     expect(fromDateInput("")).toBeUndefined();
     expect(fromDateInput("15/01/2026")).toBeUndefined();
     expect(toDateInput(undefined)).toBe("");
+  });
+});
+
+describe("monthLabel", () => {
+  it("shortens a month key for chart labels", () => {
+    expect(monthLabel("2026-10")).toMatch(/^oct\.? 26$/);
+    expect(monthLabel("2027-01")).toMatch(/^janv\.? 27$/);
   });
 });
 
