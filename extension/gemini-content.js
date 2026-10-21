@@ -28,8 +28,11 @@
     // this menu has been opened, which is why they cannot be found on a fresh page.
     toolsButton: ['button[aria-label="Upload and tools"]', 'button[aria-label*="Upload" i]'],
     imageInput: ['input[type="file"][accept="image/*"]', 'input[type="file"][accept^="image"]', 'input[type="file"]'],
-    menuItem: "gem-list-item",
-    menuItemSelectedMark: ".gem-list-item-icon-selected",
+    // Tool toggles ("Create image"...). Gemini renders the menu differently by window width:
+    // narrow = <gem-list-item role=menuitemcheckbox> with a checkmark icon when on; wide =
+    // <button role=menuitemcheckbox aria-checked=true|false> inside <toolbox-drawer-item>.
+    menuItem: '[role="menuitemcheckbox"]',
+    menuItemSelectedMark: ".gem-list-item-icon-selected, .selected-icon",
     // The composer is a Quill editor inside <rich-textarea>.
     textBox: [
       'rich-textarea div.ql-editor[contenteditable="true"]',
@@ -182,10 +185,11 @@
       closeMenu();
       throw new Error('could not find the "Create image" tool in Gemini\'s menu');
     }
-    if (item.querySelector(SELECTORS.menuItemSelectedMark)) {
+    const isOn = item.getAttribute("aria-checked") === "true" || !!item.querySelector(SELECTORS.menuItemSelectedMark);
+    if (isOn) {
       closeMenu(); // already on
     } else {
-      safeClick(item.querySelector("mat-list-item") || item);
+      safeClick(item.matches("gem-list-item") ? item.querySelector("mat-list-item") || item : item);
     }
     await pause(600, 1000);
   }
