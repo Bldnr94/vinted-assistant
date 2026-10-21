@@ -2,7 +2,7 @@
 // (https://*.pages.dev/*).
 //
 // The PWA keeps all its data in the browser's IndexedDB ("vinted-assistant"). The React
-// app (src/ModelPhotos.tsx) dispatches a "va:gemini-automate" CustomEvent on window when the
+// app (src/Studio.tsx) dispatches a "va:gemini-automate" CustomEvent on window when the
 // user asks to put a garment on their AI model via Gemini. This content script listens for
 // that event, reads the garment and pose photos straight out of IndexedDB, hands them to the
 // extension's background worker to forward to a second content script that drives
@@ -60,14 +60,6 @@
   const getPose = (id) => withStore(POSES, "readonly", (s) => s.get(id));
   const putItem = (item) => withStore(ITEMS, "readwrite", (s) => s.put(item));
 
-  // Same precedence as src/ModelPhotos.tsx's garmentBlob()/basePhoto(): improved beats fixed
-  // beats the raw shot.
-  function selectedBlob(photo) {
-    if (photo.useImproved && photo.improved) return photo.improved;
-    if (photo.useFixed && photo.fixed) return photo.fixed;
-    return photo.blob;
-  }
-
   // Blob -> raw base64 (no "data:" prefix), chunked to stay well clear of any call-stack
   // limit on very large arrays. Mirrors src/photos.ts's toBase64().
   async function blobToBase64(blob) {
@@ -116,9 +108,9 @@
       const photo = (item.photos || []).find((p) => p.id === garmentPhotoId);
       if (!photo) throw new Error(`Garment photo ${garmentPhotoId} not found on item ${itemId}`);
       if (mode === "tryon" && !pose) throw new Error(`Model pose ${poseId} not found`);
-      // Enhancing starts from the photo as shot (or its auto-fix), never from an earlier studio result.
-      const source = mode === "enhance" ? (photo.useFixed && photo.fixed ? photo.fixed : photo.blob) : selectedBlob(photo);
-      garmentBase64 = await blobToBase64(source);
+      // Both modes start from the photo as shot (or its auto-fix), never from an earlier Gemini
+      // version, so the garment is not redrawn twice.
+      garmentBase64 = await blobToBase64(photo.useFixed && photo.fixed ? photo.fixed : photo.blob);
       if (pose) poseBase64 = await blobToBase64(pose.blob);
     } catch (e) {
       dispatchStatus({ status: "failed", error: (e && e.message) || "Could not read the photos." });
@@ -144,7 +136,7 @@
   }
 
   // Re-reads the item fresh (time has passed since the job started) and appends the new
-  // "ai_model" photo, matching the shape src/ModelPhotos.tsx's generate()/importFromGemini()
+  // "ai_model" photo, matching the shape the Photos screen (src/Studio.tsx)
   // already build: unapproved (include: false) until the user accepts it.
   async function appendAiModelPhoto(itemId, blob) {
     const item = await getItem(itemId);
@@ -162,7 +154,7 @@
     if (!item) throw new Error(`Item ${itemId} not found`);
     if (!(item.photos || []).some((p) => p.id === photoId)) throw new Error(`Photo ${photoId} not found on item ${itemId}`);
     const photos = item.photos.map((p) =>
-      p.id === photoId ? { ...p, improved: blob, improvedBy: "gemini", useImproved: false, colourShift: undefined } : p,
+      p.id === photoId ? { ...p, improved: blob, useImproved: false } : p,
     );
     await putItem({ ...item, photos, updatedAt: Date.now() });
   }

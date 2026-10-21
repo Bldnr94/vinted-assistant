@@ -1,7 +1,7 @@
 // Annonces → Vinted — Gemini automation content script
 //
 // Drives the Gemini web app (https://gemini.google.com/*) to reproduce, step by step, the
-// manual flow in src/ModelPhotos.tsx: attach the model photo and the garment photo, switch on
+// manual flow in src/Studio.tsx: attach the model photo and the garment photo, switch on
 // Gemini's "Create image" tool, send the prompt, wait for the generated image, and hand it
 // back. Gemini's API costs money, but the free Google AI plan covers the web UI the user is
 // already logged into.

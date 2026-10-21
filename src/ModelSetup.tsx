@@ -1,70 +1,12 @@
-// Your AI model: one body, created once, in up to 3 poses. Every try-on reuses
-// these exact photos, so the body, outfit base and room stay the same on every
-// listing. No face shows (framed from the chin down, or hidden by the phone in a
-// mirror selfie), and photos look like a private seller's own shots at home.
+// Your model: up to 3 photos of yourself or a model, added once. Gemini puts each garment on
+// these exact photos, so every listing shows the same body, pose and room. Use a photo that
+// looks like a private seller's own shot at home; no face in frame is a good idea.
 import { useEffect, useMemo, useState } from "react";
-import { errorText, postJson } from "./api";
 import { deletePose, listPoses, savePose, type ModelPose } from "./db";
-import { dataUriToBlob, resizeToJpeg } from "./photos";
+import { resizeToJpeg } from "./photos";
 import "./model.css";
 
 export const MAX_POSES = 3;
-// FASHN credits at about 0.075 USD each: model-create 2k balanced is 3 per image, 2 images.
-const COST_TRY = "about 0.45 USD";
-
-// Shared by both presets: how the photo looks and how it is framed.
-const LOOK =
-  "Casual smartphone photo taken at home by a friend, not a professional shoot: standing in front of a plain off-white wall in a bright apartment, wooden floor, soft natural window light, slightly imperfect framing, no studio lights, no retouching. Framed from the chin down to the shoes: the face and head are out of frame, not visible.";
-
-// Mirror selfie in a bedroom, the style many Vinted sellers use. The phone hides the face.
-const MIRROR =
-  "Realistic amateur smartphone mirror selfie in a bright bedroom, as posted by a private seller on Vinted: full-length floor mirror with a thin black frame, white walls, warm honey-coloured wooden floor, round jute rug, a bed with white linen at the side, a beige armchair, soft natural daylight, slightly warm tones, a little phone-camera grain, not a professional shoot, no retouching. The phone held up in one hand covers the face completely. Whole body from head to shoes visible in the mirror. No bag, no jewellery.";
-
-const PRESETS: { label: string; prompt: string }[] = [
-  {
-    label: "Mirror selfie, woman",
-    prompt:
-      `A slim woman with long brown hair, wearing a plain fitted white t-shirt, straight light blue jeans and plain white sneakers. ${MIRROR}`,
-  },
-  {
-    label: "Mirror selfie, man",
-    prompt:
-      `A man of average build with short hair, wearing a plain fitted white t-shirt, straight dark grey jeans and plain white sneakers. ${MIRROR}`,
-  },
-  {
-    label: "Woman",
-    prompt:
-      `Realistic photo of a woman's body, slim average build, wearing a plain fitted white t-shirt, slim light blue jeans and plain white sneakers. ${LOOK}`,
-  },
-  {
-    label: "Man",
-    prompt:
-      `Realistic photo of a man's body, average build, wearing a plain fitted white t-shirt, slim dark grey chinos and plain white sneakers. ${LOOK}`,
-  },
-];
-
-const POSES = [
-  "Standing straight, facing the camera, arms relaxed at the sides.",
-  "Slight three-quarter turn to the left, weight on one leg, one hand in a pocket.",
-  "Relaxed stance, hands loosely together in front, slight bend in one knee.",
-];
-
-const MIRROR_POSES = [
-  "Standing straight facing the mirror, phone in front of the face, other arm relaxed at the side.",
-  "Slight turn to the side, weight on one leg, phone in front of the face, free hand on the hip.",
-  "Facing the mirror, one foot slightly forward, phone in front of the face, free hand in a pocket.",
-];
-
-const posesFor = (text: string) => (/mirror selfie/i.test(text) ? MIRROR_POSES : POSES);
-
-const PROMPT_KEY = "model-prompt-v2"; // v1 held the studio-style prompt
-const readPrompt = () => {
-  try {
-    return localStorage.getItem(PROMPT_KEY) ?? PRESETS[0].prompt;
-  } catch {
-    return PRESETS[0].prompt;
-  }
-};
 
 function PoseImage({ blob }: { blob: Blob }) {
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);
@@ -74,53 +16,27 @@ function PoseImage({ blob }: { blob: Blob }) {
 
 export function ModelSetup({ onBack }: { onBack: () => void }) {
   const [poses, setPoses] = useState<ModelPose[]>();
-  const [person, setPerson] = useState(readPrompt);
-  const [pose, setPose] = useState(() => posesFor(readPrompt())[0]);
-  const [candidates, setCandidates] = useState<{ uri: string; base: string }[]>([]);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const reload = () => listPoses().then(setPoses);
   useEffect(() => {
     reload();
   }, []);
-  const list = posesFor(poses?.[0]?.prompt || person);
-  useEffect(() => {
-    setPose(list[Math.min(poses?.length ?? 0, list.length - 1)]);
-  }, [poses?.length, list]);
 
   if (!poses) return null;
-  const first = poses[0];
   const full = poses.length >= MAX_POSES;
 
-  const generate = async () => {
-    setBusy(true);
+  const add = async (files: FileList | null) => {
+    if (!files?.length) return;
     setError("");
     try {
-      try {
-        localStorage.setItem(PROMPT_KEY, person);
-      } catch {
-        // Only a convenience; the prompt is also kept with each saved pose.
+      for (const f of Array.from(files).slice(0, MAX_POSES - poses.length)) {
+        await savePose({ id: crypto.randomUUID(), blob: await resizeToJpeg(f), createdAt: Date.now(), prompt: "" });
       }
-      // Later poses reuse the text of pose 1; with no face in frame, body, outfit and room carry the likeness.
-      const base = first ? first.prompt || person : person;
-      const prompt = first
-        ? `${base} Same body, same outfit, same room and light. Pose: ${pose}`
-        : `${base} Pose: ${pose}`;
-      const { images } = await postJson<{ images: string[] }>("/api/model", { prompt });
-      setCandidates(images.map((uri) => ({ uri, base })));
+      await reload();
     } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy(false);
+      setError(e instanceof Error ? e.message : String(e));
     }
-  };
-
-  const keep = async (blob: Blob, prompt: string) => {
-    // prompt is the person text only (no pose), so later poses can reuse it.
-    await savePose({ id: crypto.randomUUID(), blob: await resizeToJpeg(blob), createdAt: Date.now(), prompt });
-    setCandidates([]);
-    await reload();
   };
 
   return (
@@ -129,12 +45,12 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
         <button className="link" onClick={onBack}>
           ‹ Back
         </button>
-        <h1>AI model</h1>
+        <h1>My model</h1>
       </header>
       <p className="hint">
-        Create one model once. Each garment is then put on these same photos, so every listing shows the same body,
-        pose and room, with no face, like a seller's own photo at home. Each pose gives one AI photo per item
-        (about 0.23 USD each).
+        Add one to {MAX_POSES} photos of yourself or a model, once. In the Photos step Gemini puts each garment on these same
+        photos, one model photo per photo here, so every listing shows the same body, pose and room, like a seller's own photo
+        at home.
       </p>
 
       {poses.length > 0 && (
@@ -143,11 +59,11 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
             <figure key={p.id}>
               <PoseImage blob={p.blob} />
               <figcaption>
-                Pose {i + 1}
+                Photo {i + 1}
                 <button
                   className="link danger"
                   onClick={async () => {
-                    if (!confirm("Delete this pose?")) return;
+                    if (!confirm("Delete this photo?")) return;
                     await deletePose(p.id);
                     await reload();
                   }}
@@ -160,67 +76,27 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
         </div>
       )}
 
+      {error && <p className="error">{error}</p>}
       {!full && (
         <section className="model-new">
-          <h2>{first ? `Add pose ${poses.length + 1}` : "Describe your model"}</h2>
-          {!first && (
-            <>
-              <div className="actions">
-                {PRESETS.map((p) => (
-                  <button key={p.label} onClick={() => setPerson(p.prompt)}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              <label>
-                Body, base outfit and room
-                <textarea rows={6} value={person} onChange={(e) => setPerson(e.target.value)} />
-              </label>
-              <p className="hint">
-                Keep the base outfit plain and fitted (white t-shirt, slim trousers): try-on swaps it for your garment.
-                Keep "face out of frame" if you don't want a face on your listings.
-              </p>
-            </>
-          )}
-          <label>
-            Pose
-            <textarea rows={2} value={pose} onChange={(e) => setPose(e.target.value)} />
+          <label className="button upload primary">
+            {poses.length ? "Add another photo" : "Add my model photo"}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              hidden
+              onChange={(e) => {
+                void add(e.target.files);
+                e.target.value = "";
+              }}
+            />
           </label>
-          {error && <p className="error">{error}</p>}
-          <div className="actions">
-            <button className="primary" disabled={busy || !person.trim() || !pose.trim()} onClick={generate}>
-              {busy ? "Creating… (up to a minute)" : candidates.length ? "Try again" : "Create 2 options"}
-            </button>
-            <label className="button upload">
-              Use my own photo
-              <input
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (f) await keep(f, "");
-                }}
-              />
-            </label>
-          </div>
           <p className="hint">
-            {COST_TRY} per try. "Use my own photo": a mirror selfie in your own room with the phone hiding your face, or a photo from the chin down,
-            against a plain wall, in a plain fitted t-shirt and trousers. Free.
+            Good choices: a mirror selfie in your own room with the phone hiding your face, or a photo from the chin down,
+            against a plain wall, in a plain fitted t-shirt and trousers (Gemini swaps that outfit for the garment). The
+            photos stay on this device and only go to Gemini when you run it.
           </p>
-          {candidates.length > 0 && (
-            <div className="poses">
-              {candidates.map((c) => (
-                <figure key={c.uri.slice(-40)}>
-                  <img src={c.uri} alt="" />
-                  <button className="primary" onClick={async () => keep(await dataUriToBlob(c.uri), c.base)}>
-                    Use this
-                  </button>
-                </figure>
-              ))}
-            </div>
-          )}
         </section>
       )}
     </>

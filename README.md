@@ -8,7 +8,8 @@ publish yourself.
   to Anthropic's API, through a small Cloudflare function that holds the API key.
 - The app never talks to Vinted: no Vinted password, no Vinted API. The optional Annonces
   script fills vinted.fr's sell form in your own browser; you always press publish.
-- Photos are only resized. Cleanup comes later and must never hide defects or change colours.
+- Real photos are only resized and gently auto-fixed on the phone. Anything Gemini makes (optional) starts
+  unticked and must be checked against the real photo before it goes on a listing.
 
 ## How it works
 
@@ -22,37 +23,24 @@ publish yourself.
    description, brand, category, size, colour, material, condition, defects, measurements to
    take and a rule-of-thumb price. Guessed fields are highlighted.
 3. **Review**: edit everything. "Compare on vinted.fr" opens a search for similar items.
-4. **Background (Gemini, Mac)**: with the Chrome extension loaded, "Improve with Gemini" sends each front,
-   back and detail photo through Gemini, which redraws the background (wood floor, white sheet, light wall or
-   plain studio) and keeps the garment. Free on your Google plan, no API key. Unlike the on-device option below,
-   Gemini redraws the whole photo, so each result starts unticked: compare colour, print, logo and defects with your
-   photo, then tick "Use Gemini version".
-   **Background (on device)**: front, back and detail shots are laid on a clean, natural background
-   (wood floor by default, white sheet, light wall, your own backdrop photo, or plain grey
-   studio) with a soft shadow, framed at 3:4. The built-in backgrounds are generated images in
-   `public/backdrops/`. "Your own" is one photo of an empty spot at home; it matches your light
-   best. Switching background is instant because the cutout is kept. The garment is cut out and
-   copied pixel for pixel, so colours and defects stay as shot. By default the cutout runs on your phone, free
-   (IS-Net through `@imgly/background-removal`; the 88 MB model downloads once, from this app,
-   on first use). In Settings you can switch to Bria RMBG 2.0 on fal.ai, which gives cleaner
-   edges for about 0.018 USD a photo. Label and defect close-ups are never changed. If the cutout's colours differ from your
-   photo, the app keeps the original unless you choose otherwise.
+4. **Photos (Gemini, Mac)**: one optional step. With the Chrome extension loaded, Gemini (free on your
+   Google plan, no API key) does two things, one photo at a time, in a Gemini tab that opens by itself:
+   - **Background**: front, back and detail photos get a clean background (wood floor, white sheet, light
+     wall or plain studio) with the garment kept.
+   - **On model**: the garment goes on your own model photo(s), added once in Settings → My model (one to
+     three photos of yourself or a model, no image-generation service involved).
+
+   "Do everything with Gemini" queues both. Gemini redraws the whole photo, so every result starts
+   unticked: compare colour, print, logo and defects with your real photo, then tick "Use Gemini version" or
+   "Add to listing". Model photos start from the as-shot (or auto-fixed) garment photo, never from an
+   improved one, so the garment is not redrawn twice. Ticked model photos go after every real photo, and the
+   description gets a line saying they are AI-generated illustrations. Labels and defect close-ups are never
+   sent. On a phone, where the extension cannot run, "On a phone: do it by hand in the Gemini app" copies the
+   prompt and shares the model photo and the garment to the Gemini app; you import the result back.
 5. **List it**: either **Send to vinted.fr**, which fills vinted.fr's sell form for you (see
    "Fill on vinted.fr" below), or by hand: save the photos in listing order, open Vinted, copy
    the title and description, tap the listed values into the form. Either way you press
    publish in Vinted.
-5. **On model** (optional): the garment goes on your own AI model (FASHN Try-On Max), one
-   photo per saved pose, about 0.23 USD each. You create the model once in
-   Settings → AI model, in up to 3 poses, so every listing shows the same body and room (no face, casual phone-photo look; the default preset is a
-   mirror selfie in a bedroom with the phone hiding the face).
-   No FASHN? "Or use the Gemini app" on the same screen copies a prompt and shares the model
-   photo and the garment to the Gemini app; you import Gemini's result back. Free with a Google
-   AI plan, but done by hand and less faithful, so check colour, print and logo closely.
-   AI photos start unticked; tick only those whose colour, print and fit match the real item.
-   Ticked ones go after every real photo, and the description gets a line saying they are
-   AI-generated illustrations.
-6. **List it**: save the photos in listing order, open Vinted, copy the title and
-   description, tap the listed values into the form, press publish in Vinted.
 
 ## Setup (about 30 minutes, once)
 
@@ -75,30 +63,6 @@ You need: a GitHub account (this repo), an Anthropic API account, a free Cloudfl
      The app sends it with every draft so nobody else can spend your API credit.
    - Optional `MODEL`: `claude-sonnet-5-5` to halve the cost; default is `claude-opus-5-5`.
 4. Deploy. You get a URL like `https://vinted-assistant.pages.dev`.
-
-### 2b. fal.ai key (optional, Studio photos)
-
-Only if you switch Background cutout to fal.ai in Settings.
-
-1. Sign up at https://fal.ai, add credit (the 10 USD minimum lasts about 550 photos), and create an API key.
-2. In Cloudflare Pages, add it as the secret `FAL_KEY`, then redeploy.
-
-### 2c. FASHN key (AI model photos, optional)
-
-1. Sign up at https://app.fashn.ai, open **Developer API**, buy credits (about 0.075 USD each,
-   minimum top-up around 7.50 USD) and create an API key.
-2. In Cloudflare Pages, **Settings → Variables and Secrets**, add it for Production as the
-   **Secret** `FASHN_API_KEY`, then redeploy (Deployments → ⋯ → Retry deployment).
-3. On the phone: **Settings → AI model**, pick Woman or Man (or edit the description), tap
-   **Create 2 options** (about 0.45 USD) and **Use this** on the one you like. Add a second pose
-   the same way. The presets ask for a casual phone photo at home, framed from the chin down so
-   no face appears. Or use a chin-down photo of yourself instead, for free.
-
-Costs per item: 3 credits per pose (Try-On Max, 2k, balanced), about 0.23 USD a pose.
-To cut that to about 0.075 USD, add the variable `TRYON_QUALITY` = `fast` in Cloudflare
-(1k, 1 credit). Creating the model is free with your own photo. Photos are sent inline and results come back inline: FASHN deletes the inputs after
-processing and keeps the outputs for one hour; it keeps a record of each request (no images).
-FASHN does not train on your images.
 
 ### 3. Lock it to you (recommended)
 
@@ -225,15 +189,15 @@ npm run preview                  # builds and serves app + /api/draft on http://
 
 ## Layout
 
-- `src/`: the React PWA (screens in `App.tsx`, IndexedDB in `db.ts`, photo resize in `photos.ts`,
-  garment cutout in `cutout.ts`).
-- `scripts/cutout-assets.mjs`: runs after the build and copies the on-phone cutout model and
-  runtime into `dist/cutout/`. The library and model data are AGPL-3.0, fine for this private app.
+- `src/`: the React PWA (screens in `App.tsx`, IndexedDB in `db.ts`, photo resize and auto-fix in
+  `photos.ts`).
 - `functions/api/draft.ts`: the Cloudflare Pages Function that calls Claude.
 - `functions/api/handoff/`: stores one listing for an hour for the vinted.fr script.
 - `public/annonces-vinted.user.js`: the vinted.fr form-filling userscript.
 - `src/VintedSend.tsx`: the **Send to vinted.fr** step on the List it screen.
-- `src/ModelSetup.tsx` + `functions/api/model.ts`: create your AI model (FASHN Model Create).
-- `src/ModelPhotos.tsx` + `functions/api/tryon.ts`: put an item on it (FASHN Try-On Max).
+- `src/Studio.tsx`: the Photos step (Gemini backgrounds, on-model photos, approval).
+- `src/ModelSetup.tsx`: add your own model photo(s).
+- `src/gemini.ts` + `src/geminiPrompts.ts`: bridge to the Chrome extension in `extension/` and the prompts
+  Gemini receives.
 - `shared/listing.ts`: Vinted vocabulary (conditions, colours), shot list, draft schema.
   Correct the colour list or conditions here if vinted.fr's form differs.

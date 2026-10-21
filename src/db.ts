@@ -10,11 +10,8 @@ export interface Photo {
   addedAt: number;
   fixed?: Blob; // same photo with capped automatic exposure and colour-cast correction
   useFixed?: boolean;
-  cutout?: Blob; // transparent PNG of the garment alone, kept so a new background is instant
-  improved?: Blob; // same garment on the chosen background, garment pixels unchanged
+  improved?: Blob; // the photo with its background redrawn by Gemini (extension); starts unticked
   useImproved?: boolean;
-  improvedBy?: "gemini"; // `improved` was redrawn by Gemini (extension), not laid on a background by the Studio cutout
-  colourShift?: number; // 0-255 average channel difference measured on the garment
   include?: boolean; // AI images only: false until you approve it
 }
 

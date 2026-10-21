@@ -2,7 +2,6 @@
 // studio background; the garment's own pixels are copied unchanged so defects and
 // colours stay exactly as shot.
 import { AI_NOTICE, SHOT_ORDER, type DraftImage, type ShotKind } from "../shared/listing";
-import { drawCover } from "./backdrop";
 import type { Photo } from "./db";
 
 const MAX_SIDE = 1600;
@@ -79,98 +78,6 @@ export function photoFiles(photos: Photo[], baseName: string): File[] {
   return listingPhotos(photos).map(
     ({ blob }, i) => new File([blob], `${baseName}-${String(i + 1).padStart(2, "0")}.jpg`, { type: "image/jpeg" }),
   );
-}
-
-// Lays a cutout (transparent PNG of the garment) on a background, with the soft shadows
-// a garment casts when it lies flat: a tight contact shadow and a wide ambient one. The
-// garment's pixels are drawn once, unchanged. Returns the 3:4 JPEG and how much the
-// cutout's colours differ from the photo (should be close to 0).
-export async function composeStudio(
-  original: Blob,
-  cutout: Blob,
-  backdrop: Blob | null,
-): Promise<{ jpeg: Blob; colourShift: number }> {
-  const [orig, cut, back] = await Promise.all([
-    createImageBitmap(original),
-    createImageBitmap(cutout),
-    backdrop ? createImageBitmap(backdrop) : null,
-  ]);
-  const w = orig.width;
-  const h = orig.height;
-
-  const read = (img: ImageBitmap) => {
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext("2d", { willReadFrequently: true })!;
-    ctx.drawImage(img, 0, 0, w, h);
-    return ctx.getImageData(0, 0, w, h).data;
-  };
-  const o = read(orig);
-  const m = read(cut);
-
-  // Garment bounding box from the cutout's alpha, and colour difference on solid pixels.
-  let x0 = w, y0 = h, x1 = 0, y1 = 0, diff = 0, n = 0;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = (y * w + x) * 4;
-      const a = m[i + 3];
-      if (a > 16) {
-        if (x < x0) x0 = x;
-        if (x > x1) x1 = x;
-        if (y < y0) y0 = y;
-        if (y > y1) y1 = y;
-      }
-      if (a > 240) {
-        diff += Math.abs(m[i] - o[i]) + Math.abs(m[i + 1] - o[i + 1]) + Math.abs(m[i + 2] - o[i + 2]);
-        n += 3;
-      }
-    }
-  }
-  if (x1 <= x0 || y1 <= y0) throw new Error("No garment found in this photo.");
-
-  // Frame: 3:4, sized so the garment fills about 80% of it without being enlarged.
-  const gw = x1 - x0, gh = y1 - y0;
-  const frameH = Math.min(MAX_SIDE, Math.max(gh / 0.8, ((gw / 0.78) * 4) / 3));
-  const frameW = (frameH * 3) / 4;
-  const scale = Math.min(1, (0.78 * frameW) / gw, (0.8 * frameH) / gh);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(frameW);
-  canvas.height = Math.round(frameH);
-  const ctx = canvas.getContext("2d")!;
-  if (back) {
-    drawCover(ctx, back, canvas.width, canvas.height);
-    back.close();
-  } else {
-    const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    bg.addColorStop(0, "#f6f6f4");
-    bg.addColorStop(1, "#e8e8e5");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  // Garment centred, a touch above the middle; shadows are cast from far off-canvas so
-  // only the shadow lands and the garment itself is drawn exactly once.
-  const dx = canvas.width / 2 - ((x0 + x1) / 2) * scale;
-  const dy = canvas.height * 0.49 - ((y0 + y1) / 2) * scale;
-  const k = canvas.height / MAX_SIDE;
-  const off = canvas.width + w * scale + 100;
-  const shadow = (color: string, blur: number, ox: number, oy: number) => {
-    ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = blur * k;
-    ctx.shadowOffsetX = off + ox * k;
-    ctx.shadowOffsetY = oy * k;
-    ctx.drawImage(cut, dx - off, dy, w * scale, h * scale);
-    ctx.restore();
-  };
-  shadow("rgba(40, 30, 20, 0.16)", 46, 8, 16);
-  shadow("rgba(30, 22, 14, 0.32)", 9, 2, 4);
-  ctx.drawImage(cut, dx, dy, w * scale, h * scale);
-  orig.close();
-  cut.close();
-
-  return { jpeg: await canvasToJpeg(canvas), colourShift: n ? diff / n : 0 };
 }
 
 // Caps that keep the automatic fix a correction, never a different-looking garment.

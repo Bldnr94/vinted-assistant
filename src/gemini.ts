@@ -23,17 +23,16 @@ export function useGeminiVersion(): number {
   return v;
 }
 
-// Asks the extension (if installed) to run the garment + pose + prompt through Gemini and
-// bring the result back as a new AI photo on this item. No-op if the extension isn't
-// installed or its content script hasn't loaded on this page.
-export function requestGeminiAutomation(itemId: string, garmentPhotoId: string, poseId: string, prompt: string) {
-  window.dispatchEvent(new CustomEvent("va:gemini-automate", { detail: { itemId, garmentPhotoId, poseId, prompt } }));
-}
+// One Gemini job for the Chrome extension. "enhance": redraw the background of ONE photo of
+// the item; the result is stored on that photo (Photo.improved, unticked). "tryon": put the
+// garment photo on a saved model pose; the result is added to the item as an unapproved AI
+// photo. Resolves when the result is saved, rejects with a readable message if the extension is
+// missing or Gemini fails. Jobs must run one at a time.
+export type GeminiJob =
+  | { mode: "enhance"; itemId: string; photoId: string; prompt: string }
+  | { mode: "tryon"; itemId: string; photoId: string; poseId: string; prompt: string };
 
-// Asks the extension to send ONE photo of the item through Gemini with `prompt` and store the
-// result on that photo (Photo.improved, improvedBy "gemini"). Resolves when it is saved,
-// rejects with a readable message if the extension is missing or Gemini fails.
-export function requestGeminiEnhance(itemId: string, photoId: string, prompt: string): Promise<void> {
+export function runGeminiJob(job: GeminiJob): Promise<void> {
   return new Promise((resolve, reject) => {
     let started = false;
     const cleanup = () => {
@@ -62,6 +61,10 @@ export function requestGeminiEnhance(itemId: string, photoId: string, prompt: st
       reject(new Error("Gemini took too long. Check the Gemini tab."));
     }, 6 * 60 * 1000);
     window.addEventListener("va:gemini-status", onStatus);
-    window.dispatchEvent(new CustomEvent("va:gemini-automate", { detail: { mode: "enhance", itemId, garmentPhotoId: photoId, prompt } }));
+    window.dispatchEvent(
+      new CustomEvent("va:gemini-automate", {
+        detail: { mode: job.mode, itemId: job.itemId, garmentPhotoId: job.photoId, poseId: job.mode === "tryon" ? job.poseId : undefined, prompt: job.prompt },
+      }),
+    );
   });
 }

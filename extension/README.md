@@ -12,16 +12,14 @@ real "Ajouter" button yourself.
 
 ## Gemini automation (optional, experimental)
 
-The app's "On model" screen has an "Automate with Gemini (Mac, this browser)" button next to
-the manual Gemini steps. With this extension loaded, it opens (or focuses) a
-`gemini.google.com` tab, uploads the garment + pose photos, types the prompt, waits for
-Gemini's generated image, and feeds it back into the app as a new AI photo — no manual
+The app's "Photos" screen has "Do everything with Gemini" and per-section buttons. With this
+extension loaded, each job opens (or reloads) a `gemini.google.com` tab, uploads the photo(s),
+types the prompt, waits for Gemini's generated image, and feeds it back into the app: either
+a new background for one of your photos ("enhance": one photo in, the result stored on that
+photo as `improved`, unticked until you approve it) or a model photo ("tryon": your model
+photo plus the garment, added as an unapproved AI photo). Both start from the photo as shot,
+so the garment is never redrawn twice. Jobs run one after the other; no manual
 share/copy/import needed.
-
-The same machinery also powers "Improve with Gemini" on the Background screen: it sends one
-photo (no model pose) with a prompt that replaces only the background, and the bridge script
-stores Gemini's result on that photo (`improved`, flagged `improvedBy: "gemini"`, unticked
-until you approve it).
 
 What it does on Gemini, in order: reloads Gemini onto a fresh chat, switches on the "Create
 image" tool (without it Gemini refuses), attaches the model photo then the garment photo
