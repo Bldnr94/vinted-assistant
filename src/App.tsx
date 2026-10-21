@@ -214,6 +214,7 @@ function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
               cutout: undefined,
               improved: undefined,
               useImproved: undefined,
+              improvedBy: undefined,
               colourShift: undefined,
             }
           : p,

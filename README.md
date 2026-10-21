@@ -22,7 +22,12 @@ publish yourself.
    description, brand, category, size, colour, material, condition, defects, measurements to
    take and a rule-of-thumb price. Guessed fields are highlighted.
 3. **Review**: edit everything. "Compare on vinted.fr" opens a search for similar items.
-4. **Background**: front, back and detail shots are laid on a clean, natural background
+4. **Background (Gemini, Mac)**: with the Chrome extension loaded, "Improve with Gemini" sends each front,
+   back and detail photo through Gemini, which redraws the background (wood floor, white sheet, light wall or
+   plain studio) and keeps the garment. Free on your Google plan, no API key. Unlike the on-device option below,
+   Gemini redraws the whole photo, so each result starts unticked: compare colour, print, logo and defects with your
+   photo, then tick "Use Gemini version".
+   **Background (on device)**: front, back and detail shots are laid on a clean, natural background
    (wood floor by default, white sheet, light wall, your own backdrop photo, or plain grey
    studio) with a soft shadow, framed at 3:4. The built-in backgrounds are generated images in
    `public/backdrops/`. "Your own" is one photo of an empty spot at home; it matches your light

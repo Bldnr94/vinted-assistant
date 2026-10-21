@@ -18,6 +18,11 @@ the manual Gemini steps. With this extension loaded, it opens (or focuses) a
 Gemini's generated image, and feeds it back into the app as a new AI photo — no manual
 share/copy/import needed.
 
+The same machinery also powers "Improve with Gemini" on the Background screen: it sends one
+photo (no model pose) with a prompt that replaces only the background, and the bridge script
+stores Gemini's result on that photo (`improved`, flagged `improvedBy: "gemini"`, unticked
+until you approve it).
+
 What it does on Gemini, in order: reloads Gemini onto a fresh chat, switches on the "Create
 image" tool (without it Gemini refuses), attaches the model photo then the garment photo
 (the prompt calls them image 1 and image 2), types the prompt, sends, waits for the generated

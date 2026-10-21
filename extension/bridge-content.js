@@ -105,18 +105,21 @@
 
   async function handleAutomate(detail) {
     const { itemId, garmentPhotoId, poseId, prompt } = detail || {};
+    // "tryon": garment + model pose -> new AI photo on the item. "enhance": one photo of the
+    // item -> Gemini redraws its background, result stored on that photo (Photo.improved).
+    const mode = detail && detail.mode === "enhance" ? "enhance" : "tryon";
     let garmentBase64;
-    let poseBase64;
+    let poseBase64 = "";
     try {
-      const [item, pose] = await Promise.all([getItem(itemId), getPose(poseId)]);
+      const [item, pose] = await Promise.all([getItem(itemId), mode === "enhance" ? null : getPose(poseId)]);
       if (!item) throw new Error(`Item ${itemId} not found`);
       const photo = (item.photos || []).find((p) => p.id === garmentPhotoId);
       if (!photo) throw new Error(`Garment photo ${garmentPhotoId} not found on item ${itemId}`);
-      if (!pose) throw new Error(`Model pose ${poseId} not found`);
-      [garmentBase64, poseBase64] = await Promise.all([
-        blobToBase64(selectedBlob(photo)),
-        blobToBase64(pose.blob),
-      ]);
+      if (mode === "tryon" && !pose) throw new Error(`Model pose ${poseId} not found`);
+      // Enhancing starts from the photo as shot (or its auto-fix), never from an earlier studio result.
+      const source = mode === "enhance" ? (photo.useFixed && photo.fixed ? photo.fixed : photo.blob) : selectedBlob(photo);
+      garmentBase64 = await blobToBase64(source);
+      if (pose) poseBase64 = await blobToBase64(pose.blob);
     } catch (e) {
       dispatchStatus({ status: "failed", error: (e && e.message) || "Could not read the photos." });
       return;
@@ -126,7 +129,7 @@
     try {
       response = await chrome.runtime.sendMessage({
         type: "GEMINI_JOB_START",
-        job: { itemId, garmentPhotoId, poseId, prompt, garmentBase64, poseBase64 },
+        job: { mode, itemId, garmentPhotoId, poseId, prompt, garmentBase64, poseBase64 },
       });
     } catch (e) {
       dispatchStatus({ status: "failed", error: (e && e.message) || "Could not reach the extension." });
@@ -151,11 +154,25 @@
     await putItem(updated);
   }
 
+  // Stores Gemini's redrawn photo in the photo's "improved" slot, which every listing step
+  // already reads (listingPhotos, hand-off, on-model). It starts unapproved (useImproved
+  // false): Gemini can alter colour or print, so the user ticks it after checking.
+  async function saveEnhancedPhoto(itemId, photoId, blob) {
+    const item = await getItem(itemId);
+    if (!item) throw new Error(`Item ${itemId} not found`);
+    if (!(item.photos || []).some((p) => p.id === photoId)) throw new Error(`Photo ${photoId} not found on item ${itemId}`);
+    const photos = item.photos.map((p) =>
+      p.id === photoId ? { ...p, improved: blob, improvedBy: "gemini", useImproved: false, colourShift: undefined } : p,
+    );
+    await putItem({ ...item, photos, updatedAt: Date.now() });
+  }
+
   async function handleJobFinished(job) {
     try {
       if (job.status === "done") {
         const blob = base64ToBlob(job.resultBase64, "image/jpeg");
-        await appendAiModelPhoto(job.itemId, blob);
+        if (job.mode === "enhance") await saveEnhancedPhoto(job.itemId, job.garmentPhotoId, blob);
+        else await appendAiModelPhoto(job.itemId, blob);
         await clearJob();
         dispatchStatus({ status: "done" });
       } else {

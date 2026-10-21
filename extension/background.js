@@ -58,6 +58,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         geminiJob: {
           status: "pending",
           createdAt: Date.now(),
+          mode: job.mode === "enhance" ? "enhance" : "tryon",
           itemId: job.itemId,
           garmentPhotoId: job.garmentPhotoId,
           poseId: job.poseId,

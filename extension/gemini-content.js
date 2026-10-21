@@ -312,10 +312,14 @@
 
   async function run(job) {
     buildPanel();
-    log("Automating Gemini for this listing's model photo…");
+    log(job.mode === "enhance" ? "Automating Gemini to improve this photo's background…" : "Automating Gemini for this listing's model photo…");
     try {
-      // Pose first, garment second: the prompt calls them "image 1" and "image 2".
-      const files = [fileFromBase64(job.poseBase64, "1-modele.jpg"), fileFromBase64(job.garmentBase64, "2-vetement.jpg")];
+      // Try-on: pose first, garment second (the prompt calls them "image 1" and "image 2").
+      // Enhance: just the one photo, whose background Gemini redraws.
+      const files =
+        job.mode === "enhance"
+          ? [fileFromBase64(job.garmentBase64, "photo.jpg")]
+          : [fileFromBase64(job.poseBase64, "1-modele.jpg"), fileFromBase64(job.garmentBase64, "2-vetement.jpg")];
 
       log('Switching on the "Create image" tool…');
       await selectCreateImage();

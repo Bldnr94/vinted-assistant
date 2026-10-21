@@ -13,6 +13,7 @@ export interface Photo {
   cutout?: Blob; // transparent PNG of the garment alone, kept so a new background is instant
   improved?: Blob; // same garment on the chosen background, garment pixels unchanged
   useImproved?: boolean;
+  improvedBy?: "gemini"; // `improved` was redrawn by Gemini (extension), not laid on a background by the Studio cutout
   colourShift?: number; // 0-255 average channel difference measured on the garment
   include?: boolean; // AI images only: false until you approve it
 }

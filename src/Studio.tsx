@@ -14,7 +14,26 @@ import {
   type BackdropId,
 } from "./backdrop";
 import { cutout, readEngine } from "./cutout";
+import { requestGeminiEnhance } from "./gemini";
 import { IMPROVABLE, basePhoto, composeStudio } from "./photos";
+
+// What Gemini is asked to put behind the garment, per built-in background ("own" needs a
+// second reference photo, which the Gemini route doesn't use).
+const GEMINI_BACKDROP: Record<BackdropId, string> = {
+  wood: "a clean, light wooden floor",
+  linen: "a smooth white bed sheet",
+  wall: "a plain light-coloured wall",
+  plain: "a seamless light-grey studio backdrop",
+  own: "",
+};
+
+const geminiPrompt = (id: BackdropId) =>
+  [
+    "This is a photo of a clothing item I am selling second-hand.",
+    `Replace only the background: lay the garment on ${GEMINI_BACKDROP[id]}, with soft natural lighting and a gentle shadow under it. Remove clutter, hangers, hands and furniture around it.`,
+    "Keep the garment exactly as it is: same shape and size, same colour and shade, fabric texture, wrinkles, print, logo, buttons and stitching, and keep every stain, hole or defect visible. Do not clean, fix, recolour, add or remove anything on the garment.",
+    "Keep the same orientation, garment centred and fully visible, portrait 3:4. Photo-realistic, no text, no watermark.",
+  ].join(" ");
 
 // Average channel difference (0-255) above which the cutout no longer matches the photo.
 const MAX_COLOUR_SHIFT = 6;
@@ -68,12 +87,29 @@ export function Studio({ id, go }: { id: string; go: Go }) {
     setBusy("");
   };
 
-  // A new background re-lays every photo already done; it's quick because the cutouts are kept.
+  // Gemini route (Mac extension): each photo goes through Gemini one at a time, in a Gemini tab
+  // that opens by itself. Results land unapproved on the photo (see saveEnhancedPhoto in
+  // extension/bridge-content.js); the Gemini tab stays in front when the last one finishes.
+  const runGemini = async (photos: Photo[]) => {
+    setError("");
+    try {
+      for (const [i, p] of photos.entries()) {
+        setBusy(`Gemini ${i + 1} of ${photos.length}… about 30 s each, the Gemini tab opens by itself`);
+        await requestGeminiEnhance(item.id, p.id, geminiPrompt(backdrop));
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+    setBusy("");
+  };
+
+  // A new background re-lays every on-device photo already done; it's quick because the
+  // cutouts are kept. Gemini-made photos are left alone (they would need a new Gemini run).
   const choose = (id: BackdropId) => {
     setBackdrop(id);
     saveBackdrop(id);
     if (id === "own" && !ownSaved) return;
-    const done = improvable.filter((p) => p.improved);
+    const done = improvable.filter((p) => p.improved && !p.improvedBy);
     if (done.length) void run(done, id);
   };
 
@@ -84,7 +120,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
       setOwnSaved(true);
       setBackdrop("own");
       saveBackdrop("own");
-      const done = improvable.filter((p) => p.improved);
+      const done = improvable.filter((p) => p.improved && !p.improvedBy);
       if (done.length) await run(done, "own");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -92,6 +128,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   };
 
   const needsOwn = backdrop === "own" && !ownSaved;
+  const geminiTodo = improvable.filter((p) => p.improvedBy !== "gemini");
 
   return (
     <>
@@ -102,8 +139,9 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         <h1>Background</h1>
       </header>
       <p className="hint">
-        Front, back and detail shots are laid on a clean background with a soft shadow. The garment itself is copied
-        pixel for pixel from your photo, so colours and defects don't change.
+        Front, back and detail shots get a clean background with a soft shadow. With Gemini (Mac, free) the whole photo
+        is redrawn, so you check each result against your photo before using it. The on-device option copies the garment
+        pixel for pixel but cuts it out less cleanly.
       </p>
       <div className="chips">
         {BACKDROPS.map((b) => (
@@ -135,12 +173,18 @@ export function Studio({ id, go }: { id: string; go: Go }) {
           </label>
         </p>
       )}
-      {todo.length > 0 && !needsOwn && (
-        <button className="primary" disabled={!!busy} onClick={() => run(todo)}>
-          {busy || `Improve ${todo.length} ${todo.length === 1 ? "photo" : "photos"} (${price})`}
+      {geminiTodo.length > 0 && backdrop !== "own" && (
+        <button className="primary" disabled={!!busy} onClick={() => runGemini(geminiTodo)}>
+          {`Improve ${geminiTodo.length} ${geminiTodo.length === 1 ? "photo" : "photos"} with Gemini (Mac, free)`}
         </button>
       )}
-      {busy && todo.length === 0 && <p className="hint">{busy}</p>}
+      {backdrop === "own" && <p className="hint">Gemini can't use your own backdrop photo yet: pick another background for it.</p>}
+      {todo.length > 0 && !needsOwn && (
+        <button disabled={!!busy} onClick={() => run(todo)}>
+          {`On this device instead: ${todo.length} ${todo.length === 1 ? "photo" : "photos"} (${price})`}
+        </button>
+      )}
+      {busy && <p className="hint">{busy}</p>}
       {error && <p className="error">{error}</p>}
       {improvable.map((p) => (
         <section key={p.id} className="studio-row">
@@ -151,11 +195,38 @@ export function Studio({ id, go }: { id: string; go: Go }) {
             </figure>
             <figure>
               {p.improved ? <Thumb blob={p.improved} /> : <div className="thumb empty" />}
-              <figcaption>New background</figcaption>
+              <figcaption>{p.improvedBy === "gemini" ? "New background (Gemini)" : "New background"}</figcaption>
             </figure>
           </div>
           <div className="choice">
-            {p.improved ? (
+            {p.improved && p.improvedBy === "gemini" ? (
+              <>
+                <label className="inline">
+                  <input
+                    type="checkbox"
+                    checked={!!p.useImproved}
+                    onChange={(e) => setPhoto(p.id, { useImproved: e.target.checked })}
+                  />
+                  Use Gemini version
+                </label>
+                <p className="warn">
+                  Gemini redrew this whole photo. Tick it only if the colour, print, logo and every defect match your
+                  photo.
+                </p>
+                <button className="link" disabled={!!busy || backdrop === "own"} onClick={() => runGemini([p])}>
+                  Redo with Gemini
+                </button>
+                <button
+                  className="link danger"
+                  disabled={!!busy}
+                  onClick={() =>
+                    setPhoto(p.id, { improved: undefined, improvedBy: undefined, useImproved: undefined, colourShift: undefined })
+                  }
+                >
+                  Discard
+                </button>
+              </>
+            ) : p.improved ? (
               <>
                 <label className="inline">
                   <input
