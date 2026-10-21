@@ -310,6 +310,19 @@ function Capture({ id, batch, go }: { id: string; batch?: boolean; go: Go }) {
           onChange={(e) => update((cur) => ({ ...cur, notes: e.target.value }))}
         />
       </label>
+      <label>
+        Bought for (€, optional)
+        <input
+          type="number"
+          inputMode="decimal"
+          min="0"
+          value={item.costPrice ?? ""}
+          onChange={(e) => {
+            const costPrice = e.target.value === "" ? undefined : Number(e.target.value);
+            void update((cur) => ({ ...cur, costPrice }));
+          }}
+        />
+      </label>
       {item.photos.some((p) => p.fixed) && (
         <p className="hint">
           Front, back and detail photos get an automatic light and colour fix. Nothing is redrawn. Tap "Auto-fixed ✓"

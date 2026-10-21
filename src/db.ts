@@ -159,6 +159,8 @@ export const deleteItem = (id: string) => run(ITEMS, "readwrite", (s) => s.delet
 
 export const listSales = () => run<Sale[]>(SALES, "readonly", (s) => s.getAll());
 
+export const getSale = (itemId: string) => run<Sale | undefined>(SALES, "readonly", (s) => s.get(itemId));
+
 export const saveSale = (sale: Sale) => run(SALES, "readwrite", (s) => s.put(sale));
 
 export const deleteSale = (itemId: string) => run(SALES, "readwrite", (s) => s.delete(itemId));

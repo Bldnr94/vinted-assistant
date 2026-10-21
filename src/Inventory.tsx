@@ -4,8 +4,8 @@
 import { useEffect, useState } from "react";
 import { Thumb, useItem, type Go } from "./App";
 import { draftLabel, enqueue, useQueueVersion } from "./batch";
-import { deleteItem, deleteSale, listItems, saveItem, saveSale, type Item, type ItemStatus } from "./db";
-import { dateFr, euros } from "./format";
+import { deleteItem, deleteSale, getSale, listItems, saveItem, saveSale, type Item, type ItemStatus, type Sale } from "./db";
+import { dateFr, euros, fromDateInput, toDateInput } from "./format";
 import { basePhoto, orderedPhotos } from "./photos";
 import {
   daysSince,
@@ -18,6 +18,7 @@ import {
   snoozed,
   type DropSettings,
 } from "./pricing";
+import { parseMoney, profitOf, saleFromItem } from "./sales";
 
 const STATUS_LABEL: Record<ItemStatus, string> = { draft: "Drafts", live: "Live", sold: "Sold" };
 const FILTER_KEY = "inventory-filter";
@@ -205,6 +206,14 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
   const [selling, setSelling] = useState(false);
   const [soldPrice, setSoldPrice] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const [shipping, setShipping] = useState("");
+  const [fees, setFees] = useState("");
+  const [sale, setSale] = useState<Sale>();
+  const sold = item?.status === "sold";
+  useEffect(() => {
+    if (sold) void getSale(id).then(setSale);
+    else setSale(undefined);
+  }, [id, sold]);
   if (!item) return null;
   const d = item.draft;
   const history = item.priceHistory ?? [];
@@ -213,22 +222,23 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
     const price = Number(soldPrice);
     if (!(price > 0)) return;
     const now = Date.now();
+    const row = saleFromItem(item, { soldPrice: price, shippingCost: parseMoney(shipping), otherFees: parseMoney(fees) }, now);
+    await saveSale(row);
+    setSale(row);
     await update({ ...item, status: "sold", soldAt: now, soldPrice: price, snoozedUntil: undefined });
-    await saveSale({
-      itemId: item.id,
-      title: d?.title ?? "",
-      brand: d?.brand ?? "",
-      category_path: d?.category_path ?? "",
-      size: d?.size ?? "",
-      condition: d?.condition ?? "",
-      firstPrice: history[0]?.price ?? item.listedPrice ?? price,
-      listedPrice: item.listedPrice ?? price,
-      soldPrice: price,
-      listedAt: item.listedAt ?? item.createdAt,
-      soldAt: now,
-    });
     setSelling(false);
   };
+
+  // What you paid lives on the item; a sold item's sale row carries a copy for the stats.
+  const setCost = async (patch: Pick<Item, "costPrice" | "sourcedAt">) => {
+    await update({ ...item, ...patch });
+    if (item.status === "sold" && sale) {
+      const next = { ...sale, ...patch };
+      await saveSale(next);
+      setSale(next);
+    }
+  };
+  const profit = sale && profitOf(sale);
 
   const setStatus = async (status: ItemStatus) => {
     if (item.status === "sold") await deleteSale(item.id);
@@ -263,6 +273,15 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
               </td>
             </tr>
           )}
+          {profit && (
+            <tr>
+              <th>Profit</th>
+              <td>
+                {euros(profit.profit)}
+                {profit.costKnown ? ` · ${profit.marginPct ?? 0}% margin` : " before what you paid"}
+              </td>
+            </tr>
+          )}
           <tr>
             <th>Price</th>
             <td>
@@ -284,6 +303,26 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
           )}
         </tbody>
       </table>
+
+      <div className="grid">
+        <label>
+          Bought for (€)
+          <input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            value={item.costPrice ?? ""}
+            onChange={(e) => setCost({ costPrice: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
+        </label>
+        <label>
+          Date bought
+          <input type="date" value={toDateInput(item.sourcedAt)} onChange={(e) => setCost({ sourcedAt: fromDateInput(e.target.value) })} />
+        </label>
+      </div>
+      {item.status === "sold" && !profit?.costKnown && (
+        <p className="hint">Add what you paid to see your real profit on this sale.</p>
+      )}
 
       {item.status === "live" && (
         <>
@@ -324,26 +363,37 @@ export function ItemPage({ id, go }: { id: string; go: Go }) {
             />
           </label>
           {selling ? (
-            <div className="actions">
-              <input
-                type="number"
-                inputMode="decimal"
-                value={soldPrice}
-                onChange={(e) => setSoldPrice(e.target.value)}
-                aria-label="Sold for (€)"
-                autoFocus
-              />
-              <button className="primary" disabled={!(Number(soldPrice) > 0)} onClick={sell}>
-                Sold for {soldPrice || "…"} €
-              </button>
-              <button onClick={() => setSelling(false)}>Cancel</button>
-            </div>
+            <>
+              <div className="grid">
+                <label>
+                  Sold for (€)
+                  <input type="number" inputMode="decimal" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} autoFocus />
+                </label>
+                <label>
+                  Shipping you paid (€)
+                  <input type="number" inputMode="decimal" min="0" value={shipping} onChange={(e) => setShipping(e.target.value)} />
+                </label>
+                <label>
+                  Other fees (€)
+                  <input type="number" inputMode="decimal" min="0" value={fees} onChange={(e) => setFees(e.target.value)} />
+                </label>
+              </div>
+              <p className="hint">Shipping and fees are optional; they make your profit exact.</p>
+              <div className="actions">
+                <button className="primary" disabled={!(Number(soldPrice) > 0)} onClick={sell}>
+                  Sold for {soldPrice || "…"} €
+                </button>
+                <button onClick={() => setSelling(false)}>Cancel</button>
+              </div>
+            </>
           ) : (
             <div className="actions">
               <button
                 className="primary"
                 onClick={() => {
                   setSoldPrice(String(item.listedPrice ?? ""));
+                  setShipping("");
+                  setFees("");
                   setSelling(true);
                 }}
               >

@@ -21,7 +21,16 @@ function yearMonth(t: number): { year: number; month: string } {
   return { year: Number(p.find((x) => x.type === "year")!.value), month: p.find((x) => x.type === "month")!.value };
 }
 
-export const yearOf = (t: number) => yearMonth(t).year;
+// <input type="date"> values: "YYYY-MM-DD" in Paris time, and back. A date is stored as noon UTC, which
+// is the same calendar day in Paris all year (summer and winter time).
+export const toDateInput = (t: number | undefined) => (t === undefined ? "" : new Date(t).toLocaleDateString("sv-SE", { timeZone: TIME_ZONE }));
+
+export function fromDateInput(s: string): number | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12) : undefined;
+}
+
+export const yearOf =(t: number) => yearMonth(t).year;
 
 // "2026-04": the month a timestamp falls in, in Paris time.
 export const monthKey = (t: number) => {

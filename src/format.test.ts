@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateFr, dateLong, euros, monthKey, round2, yearOf } from "./format";
+import { dateFr, dateLong, euros, fromDateInput, monthKey, round2, toDateInput, yearOf } from "./format";
 
 // Intl uses non-breaking spaces; compare with plain ones.
 const plain = (s: string) => s.replace(/[  ]/g, " ");
@@ -24,6 +24,20 @@ describe("round2", () => {
   it("rounds to cents", () => {
     expect(round2(4.79 - 0.1)).toBe(4.69);
     expect(round2(10)).toBe(10);
+  });
+});
+
+describe("date inputs", () => {
+  it("round-trips a calendar day in both summer and winter time", () => {
+    for (const day of ["2026-01-15", "2026-07-01", "2026-03-29", "2026-10-25"]) {
+      expect(toDateInput(fromDateInput(day))).toBe(day);
+    }
+  });
+
+  it("gives nothing for an empty or malformed value", () => {
+    expect(fromDateInput("")).toBeUndefined();
+    expect(fromDateInput("15/01/2026")).toBeUndefined();
+    expect(toDateInput(undefined)).toBe("");
   });
 });
 
