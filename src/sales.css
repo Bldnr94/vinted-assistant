@@ -1,0 +1,14 @@
+.sales-total { display: flex; gap: 12px; margin: 4px 0 8px; }
+.sales-total > div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.sales-total small { display: block; color: var(--muted); font-size: 13px; }
+.sales-total strong { font-size: 22px; }
+.sales-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+.sale-row {
+  width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  text-align: left; padding: 12px 14px;
+}
+.sale-row span { display: grid; gap: 2px; min-width: 0; }
+.sale-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sale-row small { color: var(--muted); }
+.sale-row b { font-variant-numeric: tabular-nums; }
+.sale-editor { border: 1px solid var(--line); border-top: none; border-radius: 0 0 12px 12px; padding: 12px 14px 14px; margin-top: -6px; }

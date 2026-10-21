@@ -17,7 +17,8 @@ export function parseMoney(text: string): number | undefined {
   return Number.isFinite(n) && n >= 0 ? round2(n) : undefined;
 }
 
-const withoutUndefined = <T extends object>(o: T): T =>
+// Cleared fields are removed rather than stored as undefined.
+export const withoutUndefined = <T extends object>(o: T): T =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 
 // Shipping and fees belong to the sale only; the cost price comes from the item.

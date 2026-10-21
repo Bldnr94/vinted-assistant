@@ -52,7 +52,7 @@ export default function App() {
       {blocked && <p className="warn">Another tab of this app is open. Close it, then reload this page.</p>}
       {screen.name === "home" && <Home go={setScreen} />}
       {screen.name === "settings" && <Settings go={setScreen} />}
-      {screen.name === "sales" && <Sales />}
+      {screen.name === "sales" && <Sales go={setScreen} />}
       {screen.name === "stats" && <Stats />}
       {screen.name === "pro" && <Pro />}
       {screen.name === "capture" && <Capture key={screen.id} id={screen.id} batch={screen.batch} go={setScreen} />}
