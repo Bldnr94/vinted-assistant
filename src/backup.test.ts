@@ -61,6 +61,12 @@ describe("backup file", () => {
     expect(JSON.parse(manifest).settings).toEqual({ "price-drop-settings": "{}" });
   });
 
+  it("carries the business profile with the other settings", () => {
+    const profile = '{"sellsAsBusiness":true,"siret":"12345678200010"}';
+    const entries = buildEntries(rows(), { "business-profile": profile, "unknown-key": "x" });
+    return entries[0].data.text().then((t) => expect(JSON.parse(t).settings).toEqual({ "business-profile": profile }));
+  });
+
   it("ignores a token smuggled into a backup's settings on import", async () => {
     const manifest = JSON.stringify({
       app: "vinted-assistant", schemaVersion: 3, exportedAt: 1, items: [], sales: [], poses: [],

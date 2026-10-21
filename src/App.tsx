@@ -18,6 +18,7 @@ import { useGeminiVersion } from "./gemini";
 import { Replies, ReplySettingsFields } from "./Replies";
 import { BackupBanner, BackupSection } from "./BackupSection";
 import { BottomNav, TOP_LEVEL } from "./BottomNav";
+import { BusinessSection } from "./BusinessSection";
 import { Pro } from "./ProScreen";
 import { Sales } from "./SalesScreen";
 import { Stats } from "./StatsScreen";
@@ -181,6 +182,7 @@ function Settings({ go }: { go: Go }) {
         <button onClick={() => go({ name: "model", back: { name: "settings" } })}>My model</button>
       </div>
       <ReplySettingsFields />
+      <BusinessSection />
       <BackupSection />
     </>
   );

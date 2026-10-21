@@ -16,7 +16,7 @@ import {
 import { openZip, zipBlobs, type ZipEntry } from "./zip";
 
 export const SCHEMA_VERSION = 3; // the IndexedDB version the data was exported from
-export const BACKUP_SETTING_KEYS = ["price-drop-settings", "reply-settings", "studio-backdrop", "inventory-filter"];
+export const BACKUP_SETTING_KEYS = ["price-drop-settings", "reply-settings", "studio-backdrop", "inventory-filter", "business-profile"];
 const LAST_BACKUP_KEY = "last-backup-at";
 
 interface BlobRef {
