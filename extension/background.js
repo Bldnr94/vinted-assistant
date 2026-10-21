@@ -49,15 +49,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: false, error: "An automation is already running." });
         return;
       }
+      // The bridge script sends the job nested under `job`, not flat on the message.
+      const job = message.job || {};
       await chrome.storage.local.set({
         geminiJob: {
           status: "pending",
-          itemId: message.itemId,
-          garmentPhotoId: message.garmentPhotoId,
-          poseId: message.poseId,
-          prompt: message.prompt,
-          garmentBase64: message.garmentBase64,
-          poseBase64: message.poseBase64,
+          itemId: job.itemId,
+          garmentPhotoId: job.garmentPhotoId,
+          poseId: job.poseId,
+          prompt: job.prompt,
+          garmentBase64: job.garmentBase64,
+          poseBase64: job.poseBase64,
         },
       });
       const tabs = await chrome.tabs.query({ url: "https://gemini.google.com/*" });
