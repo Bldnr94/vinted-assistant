@@ -50,6 +50,10 @@ Files that work together:
 After pulling an update, reload the extension in `chrome://extensions` and reload the app's
 tab, since content scripts are injected when a page loads.
 
+`bridge-content.js` opens the app's IndexedDB **without a version number**, so it always gets whatever
+version the app has migrated to, and a future schema bump cannot break it. If the database does not exist
+yet (the app never ran on this origin) it aborts with "Open the app once" instead of creating an empty one.
+
 If it stops working after a Gemini redesign, use the manual steps underneath the button —
 they're unaffected.
 

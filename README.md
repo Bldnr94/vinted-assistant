@@ -4,8 +4,9 @@ A personal, phone-first web app: photograph one of your own garments, get a Fren
 vinted.fr listing drafted by Claude, review it, then hand it to the Vinted app and press
 publish yourself.
 
-- Photos and drafts stay on your phone (browser storage). Only the draft call sends photos,
-  to Anthropic's API, through a small Cloudflare function that holds the API key.
+- Photos and drafts stay on your phone (browser storage), plus a backup file you make yourself in
+  Settings. Only the draft call sends photos, to Anthropic's API, through a small Cloudflare function
+  that holds the API key.
 - The app never talks to Vinted: no Vinted password, no Vinted API. The optional Annonces
   script fills vinted.fr's sell form in your own browser; you always press publish.
 - Real photos are only resized and gently auto-fixed on the phone. Anything Gemini makes (optional) starts
@@ -177,6 +178,52 @@ mark each change yourself.
 - **Mark as sold** records the sale price. Sales are kept even if you delete the item, so they can
   feed price suggestions later.
 
+## Sales, profit and stats
+
+The bottom bar has **Items**, **Sales**, **Stats**, **Settings** (and **Pro** for business sellers).
+
+- **What you paid.** Enter "Bought for" (and optionally the date) when you photograph an item or later on
+  its page. When you mark an item sold you can add the shipping you paid and any other fees; the profit is
+  shown on the item.
+- **Sales** lists every sale, newest first, with its profit. Tap one to complete it afterwards: cost,
+  shipping, fees, the date it sold and the date the money reached you. A sale without a cost says "before
+  cost" and the totals say the profit is partial until you add it.
+- **Stats** shows revenue, profit, margin (over the sales that have a cost), average time to sell,
+  sell-through, the last six months, live items by age (the 90+ days bucket is highlighted) and your top
+  brands and categories. Days and months follow Paris time.
+
+## Backup
+
+Everything lives in the browser's storage, so clearing site data or a storage clean-up would erase it.
+**Settings → Backup** exports one `.zip` (items, every photo version, sales, model photos and your settings;
+**never the app token**) and imports it back. **Merge** adds what is missing and keeps the newer version of
+each item (items deleted since the backup come back); **Replace** erases the device first, saves a safety
+copy of your current data before doing so, and either completes fully or changes nothing. Home reminds you
+once a month. A backup is stored uncompressed, so a large shop makes a large file; on a phone it opens the
+share sheet (Files, iCloud, a message).
+
+## Pro tools (France)
+
+For people who sell as a business (Settings → "I sell as a business" shows the **Pro** tab and the business
+details: name, SIRET, status, VAT regime, address, receipt footer).
+
+- **Thresholds.** Turnover (counted by the day the money reached you) against the micro-entrepreneur
+  ceiling for goods, the VAT franchise thresholds and Vinted's DAC7 reporting thresholds, each with its
+  official source and the date it was checked. They are in `src/proThresholds.ts`; update them there when
+  they change. The screen warns when they are more than a year old.
+- **Registers as CSV** (French spreadsheet format): the receipts register by payment date and the purchases
+  register from the costs you entered (including the cost of sold items whose listing you deleted).
+- This is information, not tax advice. Not covered because no official source was found: the exact line
+  between selling your own belongings and a professional activity, and how a lot bought in one go must be
+  itemised.
+
+The construction plan these features were built from is in `plans/vinted-manager-foundation-stats-pro.md`.
+
+## Tests
+
+`npm test` runs the unit tests (vitest) for the pure logic: backup file format and merge, stats, profit,
+pro thresholds, CSV, the SIRET check and formatting.
+
 ## Local development
 
 ```sh
@@ -201,3 +248,14 @@ npm run preview                  # builds and serves app + /api/draft on http://
   Gemini receives.
 - `shared/listing.ts`: Vinted vocabulary (conditions, colours), shot list, draft schema.
   Correct the colour list or conditions here if vinted.fr's form differs.
+- `src/db.ts`: the IndexedDB stores (items, sales, model photos), one shared connection.
+- `src/zip.ts` + `src/backup.ts` + `src/BackupSection.tsx` + `src/download.ts`: the backup file, its merge and
+  restore rules, and the Settings and Home UI.
+- `src/format.ts`: euros and Paris-time dates, shared by the screens and the pure modules.
+- `src/sales.ts` + `src/stats.ts`: profit per sale and the figures behind Sales and Stats
+  (`SalesScreen.tsx`, `StatsScreen.tsx`). Screens are named `*Screen.tsx` so `./Stats` cannot resolve to
+  `stats.ts` on a case-insensitive filesystem.
+- `src/BottomNav.tsx` + `src/proFlag.ts`: the tab bar and the "Pro tab" switch.
+- `src/businessProfile.ts` + `src/BusinessSection.tsx`: business details and the SIRET check.
+- `src/pro.ts` + `src/proThresholds.ts` + `src/csv.ts` + `src/ProScreen.tsx`: thresholds (with sources), the
+  two registers and their CSV export, and the Pro tab.
