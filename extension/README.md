@@ -50,6 +50,13 @@ Files that work together:
 After pulling an update, reload the extension in `chrome://extensions` and reload the app's
 tab, since content scripts are injected when a page loads.
 
+Only one job runs at a time. A job that was cut off (Gemini tab closed, Chrome quit or
+restarted mid-run, tab never loaded) no longer blocks the next one: the extension notices
+the Gemini tab that took it is gone, or that nobody picked it up within a minute, and just
+starts the new job. A job still running in an open Gemini tab blocks for at most 5 minutes;
+close that tab to free it immediately. If an old copy of the extension is stuck anyway,
+removing it and loading it again in `chrome://extensions` clears its stored job.
+
 `bridge-content.js` opens the app's IndexedDB **without a version number**, so it always gets whatever
 version the app has migrated to, and a future schema bump cannot break it. If the database does not exist
 yet (the app never ran on this origin) it aborts with "Open the app once" instead of creating an empty one.
