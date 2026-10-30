@@ -39,17 +39,40 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // sends GEMINI_JOB_START when the user asks for a model photo; gemini-content.js (running on
 // gemini.google.com) polls for it with GEMINI_JOB_POLL and reports back with GEMINI_JOB_RESULT.
 // See the relay contract in gemini-content.js's header comment for the full shape.
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// Whether an unfinished job still has something working on it. A job is dead, and must not block
+// the next one, when:
+// - it is older than 5 minutes (Gemini answers in about a minute);
+// - it is "pending" for over a minute: the Gemini tab polls as soon as it loads, so nobody
+//   picked it up (tab closed or never loaded);
+// - it is "running" but the Gemini tab that took it is gone or has left gemini.google.com
+//   (tab closed, Chrome quit mid-run). chrome.storage.local survives a restart, so without
+//   this check a job cut off that way blocked every new one until the 5 minutes ran out.
+async function jobIsAlive(job) {
+  if (!job || (job.status !== "pending" && job.status !== "running")) return false;
+  const age = Date.now() - (job.createdAt || 0);
+  if (!job.createdAt || age > 5 * 60 * 1000) return false;
+  if (job.status === "pending") return age < 60 * 1000;
+  if (typeof job.tabId !== "number") return true; // taken by an older version of this script
+  try {
+    const tab = await chrome.tabs.get(job.tabId);
+    return /^https:\/\/gemini\.google\.com\//.test(tab.url || tab.pendingUrl || "");
+  } catch {
+    return false; // tab no longer exists
+  }
+}
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !["GEMINI_JOB_START", "GEMINI_JOB_POLL", "GEMINI_JOB_RESULT"].includes(message.type)) return false;
 
   (async () => {
     if (message.type === "GEMINI_JOB_START") {
       const { geminiJob } = await chrome.storage.local.get("geminiJob");
-      // A job left "pending"/"running" for more than 5 minutes is stale (tab closed mid-run,
-      // browser restarted): replace it instead of blocking every future automation.
-      const stale = !geminiJob || !geminiJob.createdAt || Date.now() - geminiJob.createdAt > 5 * 60 * 1000;
-      if (geminiJob && (geminiJob.status === "pending" || geminiJob.status === "running") && !stale) {
-        sendResponse({ ok: false, error: "An automation is already running." });
+      // A dead job (see jobIsAlive) is simply replaced.
+      if (await jobIsAlive(geminiJob)) {
+        sendResponse({
+          ok: false,
+          error: "Gemini is still working on another photo in the Gemini tab. Wait for it to finish, or close the Gemini tab and try again.",
+        });
         return;
       }
       // The bridge script sends the job nested under `job`, not flat on the message.
@@ -88,7 +111,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       // Marking it "running" here, before handing the job back, is what stops a page reload
       // on gemini.google.com from re-processing the same job: a second poll sees "running",
       // not "pending", and gets null.
-      const running = { ...geminiJob, status: "running" };
+      // tabId lets jobIsAlive see later whether that Gemini tab is still there.
+      const running = { ...geminiJob, status: "running", tabId: sender.tab && sender.tab.id };
       await chrome.storage.local.set({ geminiJob: running });
       sendResponse(running);
       return;

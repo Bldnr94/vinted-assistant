@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Annonces → Vinted",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.",
   "icons": {
     "192": "icons/icon-192.png",
