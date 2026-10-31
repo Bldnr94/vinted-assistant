@@ -1,14 +1,9 @@
-# Annonces → Vinted (Chrome extension)
+# Annonces (Chrome extension, Gemini helper)
 
-This is a Chrome MV3 unpacked extension version of the Tampermonkey/Userscripts script at
-`../public/annonces-vinted.user.js`. It does exactly the same thing — it never needs a
-userscript manager on a Mac running desktop Chrome.
-
-On `https://www.vinted.fr/*`, when you're on the sell page (`/items/new...`), it shows a
-small "Annonces" panel. Tapping "Fill the form" reads a handoff link from your clipboard,
-downloads the listing JSON from your own Cloudflare Pages site, and fills in the sell
-form's fields and photos at a human pace. It never presses publish — you always press the
-real "Ajouter" button yourself.
+This unpacked Chrome extension runs the app's Gemini jobs (below). It **does not run on
+vinted.fr**. Until 1.0.8 it also had a vinted.fr form-filling script; that was removed in 1.1.0
+because Vinted's terms ban scripts on its site and the account was restricted for 24 hours on
+2026-10-31 for "automated activity". Fill Vinted by hand from the app's **List it** screen.
 
 ## Gemini automation (optional, experimental)
 
@@ -69,7 +64,7 @@ they're unaffected.
 1. Open `chrome://extensions` in Chrome.
 2. Turn on "Developer mode" (top right).
 3. Click "Load unpacked" and select this `extension/` folder.
-4. Open vinted.fr's sell page — the "Annonces" panel should appear at the bottom of the screen.
+4. Open the app and the Gemini buttons on the Photos screen become active.
 
 ## Updating
 
@@ -81,13 +76,7 @@ This is an unpacked extension, so it does not auto-update. To pick up a new vers
 
 ## Custom domain caveat
 
-`manifest.json` grants `host_permissions` for `https://*.pages.dev/*` only. This lets the
-background service worker fetch the handoff JSON from your Cloudflare Pages site without
-being blocked by CORS (a privilege only the extension's own background/service-worker
-context gets — a fetch from the content script injected into vinted.fr would still be
-subject to vinted.fr's CORS policy, regardless of permissions).
-
-If your Cloudflare Pages site is served from a **custom domain** instead of the default
-`*.pages.dev` subdomain, add that origin (e.g. `"https://annonces.example.com/*"`) to the
-`host_permissions` array in `manifest.json`, then reload the extension in
-`chrome://extensions` for the change to take effect.
+`manifest.json` lists the app's sites as `https://*.pages.dev/*` (where the bridge script runs).
+If your Cloudflare Pages site is served from a **custom domain**, add that origin (e.g.
+`"https://annonces.example.com/*"`) to `host_permissions` and to the bridge script's `matches`
+in `manifest.json`, then reload the extension in `chrome://extensions`.

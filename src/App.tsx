@@ -8,9 +8,9 @@ import {
   type ShotKind,
 } from "../shared/listing";
 import { cleanLegacyFields, deleteItem, getItem, listItems, newItem, saveItem, type Item, type Photo } from "./db";
-import { VintedSend } from "./VintedSend";
 import { IMPROVABLE, autoFix, listingDescription, listingPhotos, orderedPhotos, photoFiles, resizeToJpeg } from "./photos";
 import { Studio } from "./Studio";
+import { download } from "./download";
 import { ModelSetup } from "./ModelSetup";
 import { DropSettingsFields, Inventory, ItemPage, MarkLive } from "./Inventory";
 import { enqueue, requestDraft, resumeQueue, useQueueVersion } from "./batch";
@@ -515,42 +515,61 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   return <button onClick={copy}>{done ? "Copied ✓" : label}</button>;
 }
 
+// "List it": everything for filling Vinted's sell form by hand, in the form's own order. Nothing
+// here runs on Vinted's pages: Vinted's terms ban scripts there, and a form-filling script got the
+// account a 24-hour restriction on 2026-10-31. Tap a row to copy its value; copied rows get a tick.
 function Handoff({ id, go }: { id: string; go: Go }) {
   const [item, update] = useItem(id);
   const [shared, setShared] = useState("");
+  const [done, setDone] = useState<Set<string>>(new Set());
   if (!item?.draft) return null;
   const d = item.draft;
   const files = photoFiles(item.photos, (d.brand || "article").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
+  const tick = (key: string) => setDone((s) => new Set(s).add(key));
 
   const savePhotos = async () => {
     if (navigator.canShare?.({ files })) {
       try {
         await navigator.share({ files });
-        setShared("Photos shared. On iPhone choose Save Images; then pick them in Vinted in this order.");
+        tick("photos");
+        setShared("Photos shared. Save them to your gallery, then pick them in Vinted in this order.");
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
       }
     }
+    // One at a time, a moment apart, so the gallery sorts them by date in listing order.
     for (const f of files) {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(f);
-      a.download = f.name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      download(f, f.name);
+      await new Promise((r) => setTimeout(r, 400));
     }
-    setShared("Photos downloaded, numbered in listing order.");
+    tick("photos");
+    setShared("Photos downloaded, numbered in listing order (newest last in your gallery).");
   };
 
-  const rows: [string, string][] = [
-    ["Catégorie", d.category_path],
-    ["Marque", d.brand],
-    ["Taille", d.size],
-    ["État", d.condition],
-    ["Couleur", d.colours.join(", ")],
-    ["Matière", d.materials],
-    ["Prix", `${d.price_suggested_eur} €`],
+  const leaf = d.category_path.split(">").pop()?.trim() ?? "";
+  const rows: { key: string; label: string; show: string; copy?: string }[] = [
+    { key: "title", label: "Titre", show: d.title, copy: d.title },
+    { key: "description", label: "Description", show: "Tap to copy the full text", copy: listingDescription(d.description, item.photos) },
+    { key: "category", label: "Catégorie", show: d.category_path, copy: leaf },
+    { key: "brand", label: "Marque", show: d.brand, copy: d.brand },
+    { key: "size", label: "Taille", show: d.size },
+    { key: "condition", label: "État", show: d.condition },
+    { key: "colour", label: "Couleur", show: d.colours.join(", ") },
+    { key: "material", label: "Matière", show: d.materials },
+    { key: "price", label: "Prix", show: `${d.price_suggested_eur} €`, copy: String(d.price_suggested_eur) },
   ];
+
+  const tap = async (r: (typeof rows)[number]) => {
+    if (r.copy) {
+      try {
+        await navigator.clipboard.writeText(r.copy);
+      } catch {
+        prompt("Copy this:", r.copy);
+      }
+    }
+    tick(r.key);
+  };
 
   return (
     <>
@@ -560,14 +579,10 @@ function Handoff({ id, go }: { id: string; go: Go }) {
         </button>
         <h1>List it</h1>
       </header>
-      <VintedSend item={item}>
-        <MarkLive item={item} update={update} go={go} />
-      </VintedSend>
-      <h2 className="or">Or by hand</h2>
       <ol className="steps">
         <li>
           <button className="primary" onClick={savePhotos}>
-            Save {files.length} {files.length === 1 ? "photo" : "photos"}
+            {done.has("photos") ? "✓ " : ""}Save {files.length} {files.length === 1 ? "photo" : "photos"}
           </button>
           {shared && <p className="hint">{shared}</p>}
           <div className="thumbs">
@@ -580,26 +595,22 @@ function Handoff({ id, go }: { id: string; go: Go }) {
           <a className="button primary" href="https://www.vinted.fr/items/new" target="_blank" rel="noreferrer">
             Open Vinted
           </a>
-          <p className="hint">Add the photos in the order shown, front first.</p>
+          <p className="hint">Opens the Vinted app's sell screen if it is installed. Add the photos in the order shown, front first.</p>
         </li>
         <li>
-          <div className="actions">
-            <CopyButton text={d.title} label="Copy title" />
-            <CopyButton text={listingDescription(d.description, item.photos)} label="Copy description" />
-          </div>
-        </li>
-        <li>
-          <p>Tap these in the Vinted form:</p>
-          <table>
+          <p>Fill the form top to bottom. Tap a row to copy it, then paste or pick it in Vinted.</p>
+          <table className="fields">
             <tbody>
-              {rows.map(([k, v]) => (
-                <tr key={k}>
-                  <th>{k}</th>
-                  <td>{v || "—"}</td>
+              {rows.map((r) => (
+                <tr key={r.key} className={done.has(r.key) ? "done" : ""} onClick={() => tap(r)}>
+                  <th>{r.label}</th>
+                  <td>{r.show || "—"}</td>
+                  <td className="mark">{done.has(r.key) ? (r.copy ? "Copied ✓" : "✓") : r.copy ? "Copy" : "Pick"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <p className="hint">Catégorie copies the last part ({leaf || "—"}) for Vinted's category search.</p>
         </li>
         <li>
           <p>Check everything in Vinted, then press publish there.</p>

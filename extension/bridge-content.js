@@ -13,7 +13,7 @@
 // script runs in an "isolated world" — it shares the page's DOM and storage (IndexedDB,
 // localStorage, cookies) with the real page, but not its JS execution context or ES modules.
 // There is no way to `import` src/db.ts from here; this file is loaded as a flat <script>,
-// same as the existing extension/content.js. So the handful of IndexedDB operations actually
+// same technique the retired vinted.fr content script used. So the handful of IndexedDB operations actually
 // needed (get an item, get a model-pose, put an updated item) are reimplemented inline below,
 // matching src/db.ts's schema (same DB name, store names, key paths; the version is not pinned).
 
