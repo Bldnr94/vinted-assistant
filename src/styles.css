@@ -107,8 +107,10 @@ th { width: 34%; color: var(--muted); font-weight: 500; }
 .choice .warn { margin: 0; }
 label.inline { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 500; }
 label.inline input { width: auto; margin: 0; }
-.vinted-send { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
-.vinted-send p:first-child { margin-top: 0; }
+table.fields tr { cursor: pointer; }
+table.fields td { overflow-wrap: anywhere; }
+table.fields td.mark { width: 1%; white-space: nowrap; color: var(--accent); font-size: 13px; }
+table.fields tr.done th, table.fields tr.done td:not(.mark) { opacity: 0.55; }
 h2.or { font-size: 15px; color: var(--muted); margin: 20px 0 8px; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
 .chip { padding: 6px 12px; font-size: 14px; border-radius: 999px; }

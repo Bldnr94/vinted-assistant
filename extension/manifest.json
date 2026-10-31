@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Annonces → Vinted",
-  "version": "1.0.8",
-  "description": "Fills the vinted.fr sell form with a listing sent from your Annonces app. It never presses publish.",
+  "name": "Annonces (Gemini helper)",
+  "version": "1.1.0",
+  "description": "Runs the app's Gemini model-photo jobs in your Gemini tab. It never runs on vinted.fr.",
   "icons": {
     "192": "icons/icon-192.png",
     "512": "icons/icon-512.png"
@@ -12,28 +12,38 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://www.vinted.fr/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    },
-    {
-      "matches": ["https://gemini.google.com/*"],
-      "js": ["gemini-main.js"],
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "gemini-main.js"
+      ],
       "run_at": "document_start",
       "world": "MAIN"
     },
     {
-      "matches": ["https://gemini.google.com/*"],
-      "js": ["gemini-content.js"],
+      "matches": [
+        "https://gemini.google.com/*"
+      ],
+      "js": [
+        "gemini-content.js"
+      ],
       "run_at": "document_idle"
     },
     {
-      "matches": ["https://*.pages.dev/*"],
-      "js": ["bridge-content.js"],
+      "matches": [
+        "https://*.pages.dev/*"
+      ],
+      "js": [
+        "bridge-content.js"
+      ],
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage", "tabs"],
+  "permissions": [
+    "storage",
+    "tabs"
+  ],
   "host_permissions": [
     "https://*.pages.dev/*",
     "https://gemini.google.com/*"
