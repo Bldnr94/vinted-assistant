@@ -7,8 +7,8 @@ publish yourself.
 - Photos and drafts stay on your phone (browser storage), plus a backup file you make yourself in
   Settings. Only the draft call sends photos, to Anthropic's API, through a small Cloudflare function
   that holds the API key.
-- The app never talks to Vinted: no Vinted password, no Vinted API. The optional Annonces
-  script fills vinted.fr's sell form in your own browser; you always press publish.
+- Nothing touches Vinted: no Vinted password, no Vinted API, no script on Vinted's pages. You
+  fill the sell form yourself from the app's copy buttons and press publish.
 - Real photos are only resized and gently auto-fixed on the phone. Anything Gemini makes (optional) starts
   unticked and must be checked against the real photo before it goes on a listing.
 
@@ -38,10 +38,9 @@ publish yourself.
    description gets a line saying they are AI-generated illustrations. Labels and defect close-ups are never
    sent. On a phone, where the extension cannot run, "On a phone: do it by hand in the Gemini app" copies the
    prompt and shares the model photo and the garment to the Gemini app; you import the result back.
-5. **List it**: either **Send to vinted.fr**, which fills vinted.fr's sell form for you (see
-   "Fill on vinted.fr" below), or by hand: save the photos in listing order, open Vinted, copy
-   the title and description, tap the listed values into the form. Either way you press
-   publish in Vinted.
+5. **List it**: save the photos in listing order, open Vinted, then go down the field rows,
+   tapping each to copy it and pasting or picking it in Vinted's form (see step 5 below). You
+   press publish in Vinted.
 
 ## Setup (about 30 minutes, once)
 
@@ -78,75 +77,26 @@ sent to your email.
 2. Install it: Share → **Add to Home Screen** (iPhone) or menu → **Install app** (Android).
 3. Open it, tap **Settings**, paste your `APP_TOKEN`, save.
 
-### 5. Fill on vinted.fr (optional, about 15 minutes)
+### 5. Listing on Vinted (by hand, about a minute)
 
-The Annonces userscript runs in your phone's browser on vinted.fr. When you tap **Fill the
-form**, it adds your photos and types every field at a human pace, then stops. You check and
-press publish. It never presses publish, never calls Vinted's API and never sees your Vinted
-password.
+The **List it** screen gives you, in the order of Vinted's sell form:
 
-**Account risk, plainly:** Vinted's terms forbid automated tools, and its page can tell typed
-input from scripted input. Some cross-listing tool users got 24-hour suspensions in 2026.
-Keeping it to your own items at a normal pace, and always publishing yourself, keeps the
-risk low but not zero. If Vinted ever shows you a warning, stop using the script and use
-the by-hand steps, which keep working.
+1. **Save photos**: shares them to your gallery, or downloads them numbered in listing order.
+2. **Open Vinted**: the sell screen, in the Vinted app if it is installed. Add the photos front first.
+3. A row per field (titre, description, catégorie, marque, taille, état, couleur, matière, prix).
+   Tap a row to copy it (title, description, category search word, brand, price) and get a tick;
+   the others show the exact Vinted wording to pick.
+4. Check everything, press publish in Vinted, then **Mark live** in the app.
 
-**a. Cloudflare (once).**
+**Why no form-filling script:** an earlier version had a userscript (and a Chrome extension
+port) that filled vinted.fr's form. Vinted's terms ban scripts, third-party tools and external
+software on its site, and on 2026-10-31 it restricted the account for 24 hours for "automated
+activity". A repeat can mean a permanent ban, so the script is retired: the copy at
+`public/annonces-vinted.user.js` is now an empty 2.0.0 that runs on no page, so an installed
+copy that auto-updates goes quiet. Delete it from Tampermonkey anyway. Don't bring it back in a
+"harder to detect" form.
 
-1. **Workers & Pages → KV → Create a namespace**, name it `vinted-handoff`.
-2. In your Pages project: **Settings → Bindings → Add → KV namespace**, variable name
-   `HANDOFF`, namespace `vinted-handoff`. Redeploy (Deployments → latest → Retry).
-3. If you set up Access in step 3: **Zero Trust → Access → Applications → Add →
-   Self-hosted**, name `Handoff`, domain `vinted-assistant.pages.dev`, path `api/handoff/`,
-   one policy with action **Bypass**, include **Everyone**. The script cannot sign in to
-   Access. The path stays protected: sending needs your `APP_TOKEN`, and each listing link is
-   a random code that expires after one hour.
-
-**b. iPhone (Safari).**
-
-1. Install **Userscripts** (free, by Justin Wasack) from the App Store. Open it once and tap
-   **Set Userscripts Directory**, pick any folder (for example On My iPhone → Userscripts).
-2. **Settings → Apps → Safari → Extensions → Userscripts**: turn it on, and under
-   permissions allow **www.vinted.fr** and **vinted-assistant.pages.dev** (or All Websites).
-3. In Safari open `https://raw.githubusercontent.com/Bldnr94/vinted-assistant/main/public/annonces-vinted.user.js`.
-   Tap the **aA** (or puzzle) icon in the address bar → **Userscripts** → **Tap to install**
-   → **Install**.
-
-**b. Android (Firefox; Chrome on Android has no extensions).**
-
-1. Install **Firefox** from the Play Store. Menu → **Add-ons** → **Tampermonkey** → **Add**.
-2. Menu → **Extensions** → **Tampermonkey** → **Dashboard** → **Utilities** → **Import from
-   URL**, paste `https://raw.githubusercontent.com/Bldnr94/vinted-assistant/main/public/annonces-vinted.user.js`
-   and tap **Install**. (Opening that address directly may not bring up the install page on
-   Android.)
-3. On the first fill, Tampermonkey asks whether the script may reach your app's address
-   (for example `vinted-assistant-a3j.pages.dev`): choose **Always allow domain**.
-
-**c. Each listing.**
-
-1. In the app, on **List it**, tap **Send to vinted.fr**, then **Copy link and open
-   vinted.fr**. The link goes to your clipboard, not into Vinted's address.
-2. Make sure you are in Safari (iPhone) or Firefox (Android), signed in to Vinted, on
-   `www.vinted.fr/items/new`. If the Vinted app opens instead, open that address in the
-   browser yourself. If the browser page only offers the app, use **aA → Request Desktop
-   Website** (Safari) or menu → **Desktop site** (Firefox); the script works there too.
-3. In the **Annonces** panel at the bottom, tap **Fill the form**, then **Paste** if the phone
-   asks. Watch it fill (about 30 seconds). Rows with ✋ need you.
-4. Check every field and the photo order, then press publish in Vinted.
-
-**If a field stops filling:** Vinted changed its page. Tap **Form report** in the panel and
-paste the copied text into the project thread; the field rules at the top of
-`public/annonces-vinted.user.js` get fixed from it. Tampermonkey and Userscripts pick up
-fixes from the GitHub address on their own; to get one straight away, use **Check for
-updates** in Tampermonkey or reinstall from the same address.
-
-### 5b. On a Mac, in desktop Chrome (optional, no userscript manager needed)
-
-`extension/` is an unpacked Chrome extension that does the same thing as the Annonces
-userscript above — same panel, same "Fill the form" button, same rule that it never presses
-publish. Load it once in `chrome://extensions` (Developer mode → Load unpacked → pick the
-`extension/` folder); see `extension/README.md` for the full steps, how to update it after a
-`git pull`, and a note for anyone using a custom domain instead of `*.pages.dev`.
+### 5b. On a Mac, in desktop Chrome (optional)
 
 The app itself (the PWA at steps 1–4) needs no changes to run in a desktop browser: open the
 same Cloudflare Pages URL in Chrome or Safari on the Mac, sign in through Access if you set
@@ -239,9 +189,7 @@ npm run preview                  # builds and serves app + /api/draft on http://
 - `src/`: the React PWA (screens in `App.tsx`, IndexedDB in `db.ts`, photo resize and auto-fix in
   `photos.ts`).
 - `functions/api/draft.ts`: the Cloudflare Pages Function that calls Claude.
-- `functions/api/handoff/`: stores one listing for an hour for the vinted.fr script.
-- `public/annonces-vinted.user.js`: the vinted.fr form-filling userscript.
-- `src/VintedSend.tsx`: the **Send to vinted.fr** step on the List it screen.
+- `public/annonces-vinted.user.js`: retired, empty stub of the old vinted.fr script (see step 5).
 - `src/Studio.tsx`: the Photos step (Gemini backgrounds, on-model photos, approval).
 - `src/ModelSetup.tsx`: add your own model photo(s).
 - `src/gemini.ts` + `src/geminiPrompts.ts`: bridge to the Chrome extension in `extension/` and the prompts

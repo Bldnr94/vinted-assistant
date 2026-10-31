@@ -113,7 +113,7 @@
     captured.push({ blob: d.blob, at: Date.now() });
   });
 
-  // ---------- panel (shadow-DOM, same technique and CSS vars as content.js's buildPanel) ----------
+  // ---------- panel (shadow-DOM, shadow DOM keeps it apart from Gemini's styles) ----------
 
   let host = null;
   const ui = {};
