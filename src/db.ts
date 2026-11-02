@@ -76,6 +76,7 @@ export interface ModelPose {
   blob: Blob; // JPEG of your AI model, reused for every try-on
   createdAt: number;
   prompt?: string; // what made it; empty for an uploaded photo
+  facing?: "front" | "back"; // which way you face in it; unset = guessed from its order (see poseFacing)
 }
 
 const DB_NAME = "vinted-assistant";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lookFor, oneLine, seedFromId, tryOnPrompt } from "./geminiPrompts";
+import { lookFor, oneLine, poseFacing, seedFromId, tryOnPrompt } from "./geminiPrompts";
 
 describe("tryOnPrompt", () => {
   it("names image 1 as the person and image 2 as the garment, in the extension's attach order", () => {
@@ -34,8 +34,32 @@ describe("listing looks", () => {
   it("swaps 'keep identical' for a new shot when a look is given", () => {
     const look = lookFor(7);
     const p = tryOnPrompt("", look);
-    expect(p).toContain(`- pose: ${look.pose};`);
+    expect(p).toContain(`- pose: ${look.pose}, without turning the body;`);
     expect(p).not.toContain("KEEP EVERYTHING ELSE IDENTICAL");
     expect(tryOnPrompt("")).toContain("KEEP EVERYTHING ELSE IDENTICAL");
+  });
+});
+
+describe("front and back model photos", () => {
+  it("shares light, spot and shoes across a listing's model photos, so the pair matches", () => {
+    const [a, b] = [lookFor(123, 0), lookFor(123, 1)];
+    expect({ light: b.light, spot: b.spot, shoes: b.shoes }).toEqual({ light: a.light, spot: a.spot, shoes: a.shoes });
+  });
+
+  it("never picks a pose that turns the body", () => {
+    for (let s = 0; s < 200; s++) expect(lookFor(s, s % 3).pose).not.toMatch(/turn|three-quarter|side view/i);
+  });
+
+  it("keeps a back photo facing away, and asks for the item's back when only the front was shot", () => {
+    const back = tryOnPrompt("", lookFor(5, 1), "back", "front");
+    expect(back).toContain("with their back to the camera");
+    expect(back).toContain("never turn them around");
+    expect(back).toContain("show the item's back");
+    expect(tryOnPrompt("", lookFor(5, 1), "back", "back")).not.toContain("show the item's back");
+  });
+
+  it("guesses the second model photo is the back one until you say otherwise", () => {
+    expect([0, 1, 2].map((i) => poseFacing({}, i))).toEqual(["front", "back", "front"]);
+    expect(poseFacing({ facing: "front" }, 1)).toBe("front");
   });
 });
