@@ -22,23 +22,29 @@ describe("pickTiles", () => {
   const worn = photo("ai_model", { include: true });
   const unapproved = photo("ai_model", { include: false });
 
-  it("leads with the real front photo, then the approved worn photo, flagged as AI for placement", () => {
-    const tiles = pickTiles([detail1, worn, back, front, label], true);
-    expect(tiles.top.map((x) => x.blob)).toEqual([front.blob, worn.blob]);
-    expect(tiles.top.map((x) => x.ai)).toEqual([false, true]);
+  it("puts the real front, then both model photos (front then back worn) on top", () => {
+    const wornBack = photo("ai_model", { include: true });
+    const tiles = pickTiles([detail1, worn, back, front, label, wornBack], true);
+    expect(tiles.top.map((x) => x.blob)).toEqual([front.blob, worn.blob, wornBack.blob]);
+    expect(tiles.top.map((x) => x.ai)).toEqual([false, true, true]);
+    expect(tiles.bottom.map((x) => x.blob)).toContain(back.blob);
     expect(collageHasAi(tiles)).toBe(true);
   });
 
-  it("uses the back instead of AI when asked, or when no AI photo is approved", () => {
-    for (const tiles of [pickTiles([front, back, worn], false), pickTiles([front, back, unapproved], true)]) {
-      expect(tiles.top.map((x) => x.blob)).toEqual([front.blob, back.blob]);
-      expect(collageHasAi(tiles)).toBe(false);
-    }
+  it("uses model photos even when they aren't ticked for the listing on their own", () => {
+    const tiles = pickTiles([front, back, unapproved], true);
+    expect(tiles.top.map((x) => x.blob)).toEqual([front.blob, unapproved.blob]);
+  });
+
+  it("uses the back instead when model photos are left out", () => {
+    const tiles = pickTiles([front, back, worn], false);
+    expect(tiles.top.map((x) => x.blob)).toEqual([front.blob, back.blob]);
+    expect(collageHasAi(tiles)).toBe(false);
   });
 
   it("keeps the label and a defect in the small tiles before a second detail", () => {
     const tiles = pickTiles([front, back, detail1, detail2, defect, label], false);
-    expect(tiles.bottom.map((x) => x.blob)).toEqual([label.blob, defect.blob, detail1.blob]);
+    expect(tiles.bottom.map((x) => x.blob)).toEqual([label.blob, defect.blob, detail1.blob, detail2.blob]);
   });
 });
 
