@@ -6,8 +6,8 @@ export interface Photo {
   id: string;
   // "ai_model" photos are AI illustrations: always placed after every real photo.
   // "collage" / "collage_ai": several photos of the item in one image, made on the phone
-  // (src/collage.ts). A collage of real photos only goes first; one with AI tiles ("collage_ai",
-  // each AI tile tagged "IA") goes right after the real front photo, never first.
+  // (src/collage.ts). A collage of real photos only goes first; one with an AI tile ("collage_ai")
+  // goes right after the real front photo, never first, and adds the AI notice to the description.
   kind: ShotKind | "ai_model" | "collage" | "collage_ai";
   blob: Blob; // resized JPEG as shot, or the AI image
   addedAt: number;

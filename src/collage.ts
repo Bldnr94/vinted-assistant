@@ -1,7 +1,7 @@
 // One image that shows the item at a glance, like many Vinted sellers' first photo: the item
 // itself and worn on top, labels, details and defects underneath. Made on the phone from photos
-// you already have, nothing is redrawn: each tile is the photo cropped to fit. AI tiles carry an
-// "IA" tag, because inside a collage a buyer can't otherwise tell which pictures are real.
+// you already have, nothing is redrawn: each tile is the photo cropped to fit. No tag is drawn on
+// AI tiles (Victor's call, 2026-11-02): the description's AI notice covers them.
 import type { ShotKind } from "../shared/listing";
 import type { Photo } from "./db";
 import { listingPhotos } from "./photos";
@@ -75,21 +75,6 @@ async function drawTile(ctx: CanvasRenderingContext2D, tile: Tile, x: number, y:
   }
   ctx.restore();
   bitmap.close();
-  if (tile.ai) {
-    const size = Math.round(W * 0.03);
-    ctx.font = `700 ${size}px system-ui, -apple-system, sans-serif`;
-    const label = "IA";
-    const pad = size * 0.5;
-    const tw = ctx.measureText(label).width + pad * 2;
-    const th = size + pad;
-    ctx.fillStyle = "rgba(0, 0, 0, 0.6)";
-    ctx.beginPath();
-    ctx.roundRect(x + 12, y + h - th - 12, tw, th, th / 3);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, x + 12 + pad, y + h - th / 2 - 12);
-  }
 }
 
 async function drawRow(ctx: CanvasRenderingContext2D, tiles: Tile[], y: number, h: number) {

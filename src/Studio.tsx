@@ -422,7 +422,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
       {ai.some((p) => p.include) && (
         <label className="inline">
           <input type="checkbox" checked={collageAi} onChange={(e) => setCollageAi(e.target.checked)} />
-          Include my approved model photo (tagged “IA” in the collage)
+          Include my approved model photo
         </label>
       )}
       <div className="actions">

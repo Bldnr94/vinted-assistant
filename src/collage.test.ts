@@ -22,7 +22,7 @@ describe("pickTiles", () => {
   const worn = photo("ai_model", { include: true });
   const unapproved = photo("ai_model", { include: false });
 
-  it("leads with the real front photo, then the approved worn photo, tagged as AI", () => {
+  it("leads with the real front photo, then the approved worn photo, flagged as AI for placement", () => {
     const tiles = pickTiles([detail1, worn, back, front, label], true);
     expect(tiles.top.map((x) => x.blob)).toEqual([front.blob, worn.blob]);
     expect(tiles.top.map((x) => x.ai)).toEqual([false, true]);
