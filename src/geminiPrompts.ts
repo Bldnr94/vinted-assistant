@@ -64,9 +64,85 @@ export const backgroundPrompt = (id: BackdropId) =>
     "Keep the same orientation, garment centred and fully visible, portrait 3:4. Photo-realistic, no text, no watermark.",
   ].join(" ");
 
+// A listing's own take on the model photo, so every listing doesn't show the exact same shot.
+// The person, the room and the mirror-selfie style stay; pose, light and spot change. Picked
+// from the listing's seed, so redoing a listing gives the same look until you shuffle it.
+export interface Look {
+  pose: string;
+  light: string;
+  spot: string;
+}
+
+const POSES = [
+  "standing relaxed, weight on one leg",
+  "one hand on the hip",
+  "body turned a little to the side, three-quarter view",
+  "free hand lightly touching the hair",
+  "free arm relaxed by the side, one knee slightly bent",
+  "mid-step, as if just turning towards the mirror",
+  "free hand holding the hem or the side of the garment",
+];
+const LIGHTS = [
+  "soft morning daylight from a window",
+  "bright, even daylight",
+  "warm late-afternoon sun with soft shadows",
+  "cosy evening light with a lamp on",
+];
+const SPOTS = [
+  "the same spot as image 1",
+  "a step to the side, so a little more of the room shows at the edge",
+  "a slightly different corner of the same room, same walls, floor and furniture style",
+  "a little closer to the mirror, still head to toe",
+];
+
+// Small seeded generator (mulberry32): the same seed always gives the same look.
+function random(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// A listing's default seed: stable for its id, different from one listing to the next.
+export function seedFromId(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+// index: which of your model photos, so two model photos in one listing don't get the same look.
+export function lookFor(seed: number, index = 0): Look {
+  const next = random(seed + index * 7919);
+  const pick = (list: string[]) => list[Math.floor(next() * list.length)];
+  return { pose: pick(POSES), light: pick(LIGHTS), spot: pick(SPOTS) };
+}
+
+const VARY_KEY = "vary-look";
+
+export function readVary(): boolean {
+  try {
+    return localStorage.getItem(VARY_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+export function saveVary(on: boolean) {
+  try {
+    localStorage.setItem(VARY_KEY, on ? "on" : "off");
+  } catch {
+    // Varies again next time.
+  }
+}
+
 // Image 1 is the model photo, image 2 the garment (the extension attaches them in that order).
 // Written on separate lines for the copy-paste route; the extension gets it through oneLine().
-export const tryOnPrompt = (styling: string) =>
+// With a look, the shot is varied (section 5) instead of kept identical to image 1.
+export const tryOnPrompt = (styling: string, look?: Look) =>
   `You are a photo-realistic virtual try-on editor.
 
 INPUTS
@@ -95,19 +171,31 @@ Only change an existing piece when the new garment makes it necessary. The resul
 - Put the garment on this person's real body, pose and proportions (shoulders, chest, waist, hips, arm and leg length), keeping its own cut: an oversized piece stays oversized, a cropped one stays cropped, a straight one stays straight. Do not make it look more fitted or more flattering than its cut allows.
 - Follow the pose: natural folds, tension, stretch and drape where the body bends, and gravity where fabric hangs.
 - Keep every seam, hem, collar and cuff aligned with the body, and make transitions between the new garment and the remaining clothes clean and realistic.
-- Respect everything in front of the garment: the phone, hands and arms stay in front and keep their exact shape and position. Hair, straps and accessories stay in their original layer order.
+- Respect everything in front of the garment: the phone, hands and arms stay in front ${
+    look ? "where they cover it" : "and keep their exact shape and position"
+  }. Hair, straps and accessories stay in their original layer order.
 
 4. EXACT GARMENT FIDELITY
 Reproduce the item from image 2 exactly: colour and shade, fabric, texture and weave, print or pattern, logo and text (position, size, spelling, and the same way round as in image 2), buttons, zips, pockets, seams, stitching, length and cut. Do not add, remove, simplify or invent any detail. Keep its real condition: any visible stain, hole, pilling, fading or wear stays visible, and do not make it look newer, brighter or freshly ironed. If part of the garment is hidden in image 2, extend it in the most plausible way consistent with its visible design, without adding new elements. Adapt only the lighting and shadows to the scene, not the garment's colour or material.
 
-5. KEEP EVERYTHING ELSE IDENTICAL
-Do not alter the person (identity, body shape, skin, pose, hair), the phone hiding the face, the mirror and its reflection logic, the room, the background, the camera angle or the framing. Do not show or add a face. The garment must also appear correctly in the mirror reflection if the reflection is visible.
+${
+    look
+      ? `5. SAME PERSON AND PLACE, A NEW SHOT
+This is a new photo of the same person in the same home, taken another day. Keep identical: the person (identity, body shape and proportions, skin, hair), the phone hiding the face, the room and its decor, and the casual mirror-selfie style and colour feel of image 1. Change only:
+- pose: ${look.pose};
+- light: ${look.light};
+- spot: ${look.spot};
+- shoes and small accessories: chosen to suit this garment's style and season (e.g. trainers, sandals, boots or heels), unless the garment is itself shoes or an accessory, or the styling above says otherwise.
+Do not show or add a face. The garment must look exactly as described in section 4 in this new pose.`
+      : `5. KEEP EVERYTHING ELSE IDENTICAL
+Do not alter the person (identity, body shape, skin, pose, hair), the phone hiding the face, the mirror and its reflection logic, the room, the background, the camera angle or the framing. Do not show or add a face. The garment must also appear correctly in the mirror reflection if the reflection is visible.`
+  }
 
 6. REALISM
-Match the scene's lighting direction, colour temperature, shadows, grain, sharpness and exposure. The new garment should cast and receive shadows (neck, arms, phone, folds) like the rest of the photo. Keep the casual phone-photo look of image 1: do not retouch, beautify, smooth skin or make it look like a studio or catalogue shot. No visible edges, halos, cut-out look or AI artifacts.
+The garment must share the photo's lighting direction, colour temperature, shadows, grain, sharpness and exposure. The new garment should cast and receive shadows (neck, arms, phone, folds) like the rest of the photo. Keep the casual phone-photo look of image 1: do not retouch, beautify, smooth skin or make it look like a studio or catalogue shot. No visible edges, halos, cut-out look or AI artifacts.
 
 OUTPUT
-One photo-realistic image, same size, aspect ratio and orientation as image 1, with no text, borders or watermarks added.`;
+One photo-realistic image, same aspect ratio and orientation as image 1, with no text, borders or watermarks added.`;
 
 // The extension types the prompt into Gemini's Quill editor, where a typed line break moves the
 // caret and scrambles the rest of the text, so automated jobs get it on a single line.

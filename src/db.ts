@@ -5,14 +5,17 @@ import { defaultFloor } from "./pricing";
 export interface Photo {
   id: string;
   // "ai_model" photos are AI illustrations: always placed after every real photo.
-  kind: ShotKind | "ai_model";
+  // "collage" / "collage_ai": several photos of the item in one image, made on the phone
+  // (src/collage.ts). A collage of real photos only goes first; one with an AI tile ("collage_ai")
+  // goes right after the real front photo, never first, and adds the AI notice to the description.
+  kind: ShotKind | "ai_model" | "collage" | "collage_ai";
   blob: Blob; // resized JPEG as shot, or the AI image
   addedAt: number;
   fixed?: Blob; // same photo with capped automatic exposure and colour-cast correction
   useFixed?: boolean;
   improved?: Blob; // the photo with its background redrawn by Gemini (extension); starts unticked
   useImproved?: boolean;
-  include?: boolean; // AI images only: false until you approve it
+  include?: boolean; // AI images and collages only: false until you approve it
 }
 
 // draft: not on Vinted yet. live: you published it. sold: you marked it sold.
@@ -45,6 +48,7 @@ export interface Item {
   sourcedAt?: number; // when you bought it
   draftState?: "queued" | "drafting" | "failed"; // batch mode's background drafting queue
   draftError?: string;
+  lookSeed?: number; // picks this listing's pose, light and spot for model photos; set by "Shuffle"
 }
 
 // One row per sale, kept when the item and its photos are deleted, to feed price suggestions later.

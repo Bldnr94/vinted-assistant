@@ -22,3 +22,9 @@ h2 em { font-style: normal; font-weight: 400; font-size: 13px; color: var(--mute
 .gemini > summary { font-weight: 600; cursor: pointer; }
 .gemini .steps { margin: 10px 0 0; }
 .prompt { user-select: all; white-space: pre-line; background: var(--card); padding: 8px 10px; border-radius: 8px; }
+.looks { margin: 4px 0 8px; }
+.looks p { margin: 4px 0; }
+.collage figure { position: relative; margin: 10px 0 0; max-width: 360px; display: flex; flex-direction: column; gap: 6px; }
+.collage img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 10px; background: var(--card); }
+.collage figure.included img { outline: 3px solid var(--accent); outline-offset: -3px; }
+.collage figcaption { display: flex; justify-content: space-between; align-items: center; font-size: 14px; gap: 6px; }

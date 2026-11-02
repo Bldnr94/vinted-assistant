@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { oneLine, tryOnPrompt } from "./geminiPrompts";
+import { lookFor, oneLine, seedFromId, tryOnPrompt } from "./geminiPrompts";
 
 describe("tryOnPrompt", () => {
   it("names image 1 as the person and image 2 as the garment, in the extension's attach order", () => {
@@ -21,5 +21,21 @@ describe("tryOnPrompt", () => {
     const flat = oneLine(tryOnPrompt("jacket open"));
     expect(flat).not.toContain("\n");
     expect(flat).toContain("INPUTS - Image 1: the person");
+  });
+});
+
+describe("listing looks", () => {
+  it("gives the same look for the same listing and model photo, and varies across them", () => {
+    expect(lookFor(42, 0)).toEqual(lookFor(42, 0));
+    const looks = new Set(Array.from({ length: 20 }, (_, i) => JSON.stringify(lookFor(seedFromId(`item-${i}`)))));
+    expect(looks.size).toBeGreaterThan(10);
+  });
+
+  it("swaps 'keep identical' for a new shot when a look is given", () => {
+    const look = lookFor(7);
+    const p = tryOnPrompt("", look);
+    expect(p).toContain(`- pose: ${look.pose};`);
+    expect(p).not.toContain("KEEP EVERYTHING ELSE IDENTICAL");
+    expect(tryOnPrompt("")).toContain("KEEP EVERYTHING ELSE IDENTICAL");
   });
 });

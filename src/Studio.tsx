@@ -11,17 +11,22 @@ import { runGeminiJob, type GeminiJob } from "./gemini";
 import {
   BACKDROPS,
   MANUAL_APPS,
+  lookFor,
   backgroundPrompt,
   oneLine,
   readBackdrop,
   readManualApp,
+  readVary,
   saveBackdrop,
   saveManualApp,
+  saveVary,
+  seedFromId,
   tryOnPrompt,
   type BackdropId,
   type ManualApp,
 } from "./geminiPrompts";
-import { IMPROVABLE, basePhoto, resizeToJpeg } from "./photos";
+import { collageHasAi, pickTiles, renderCollage } from "./collage";
+import { IMPROVABLE, basePhoto, isMade, resizeToJpeg } from "./photos";
 import "./model.css";
 
 function Img({ blob }: { blob: Blob }) {
@@ -43,6 +48,8 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const [manualPose, setManualPose] = useState(0);
   const [manualNote, setManualNote] = useState("");
   const [manualApp, setManualApp] = useState<ManualApp>(readManualApp);
+  const [vary, setVary] = useState(readVary);
+  const [collageAi, setCollageAi] = useState(true);
   useEffect(() => {
     listPoses().then(setPoses);
   }, []);
@@ -50,8 +57,13 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   if (!item || !poses) return null;
 
   const improvable = item.photos.filter((p) => IMPROVABLE.includes(p.kind as never));
-  const kept = item.photos.filter((p) => p.kind !== "ai_model" && !IMPROVABLE.includes(p.kind as never));
+  const kept = item.photos.filter((p) => !isMade(p) && !IMPROVABLE.includes(p.kind as never));
   const ai = item.photos.filter((p) => p.kind === "ai_model");
+  const collages = item.photos.filter((p) => p.kind === "collage" || p.kind === "collage_ai");
+  // Each listing gets its own pose, light and spot (one per model photo) unless you turn it off.
+  const seed = item.lookSeed ?? seedFromId(item.id);
+  const lookAt = (i: number) => (vary ? lookFor(seed, i) : undefined);
+  const promptFor = (i: number) => tryOnPrompt(styling.trim(), lookAt(i));
   // The garment shown on the model: the front shot by default, as shot (never an earlier Gemini
   // version, so the garment is not redrawn twice).
   const garment = improvable.find((p) => p.id === garmentId) ?? improvable.find((p) => p.kind === "front") ?? improvable[0];
@@ -65,7 +77,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const backgroundJobs = (photos: Photo[]): GeminiJob[] =>
     photos.map((p) => ({ mode: "enhance", itemId: item.id, photoId: p.id, prompt: backgroundPrompt(backdrop) }));
   const modelJobs = (): GeminiJob[] =>
-    garment ? poses.map((pose) => ({ mode: "tryon", itemId: item.id, photoId: garment.id, poseId: pose.id, prompt: oneLine(tryOnPrompt(styling.trim())) })) : [];
+    garment ? poses.map((pose, i) => ({ mode: "tryon", itemId: item.id, photoId: garment.id, poseId: pose.id, prompt: oneLine(promptFor(i)) })) : [];
 
   // Jobs run one after the other: each opens Gemini on a fresh chat in a tab of its own.
   const run = async (jobs: GeminiJob[]) => {
@@ -112,7 +124,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
       new File([basePhoto(garment)], "2-vetement.jpg", { type: "image/jpeg" }),
     ];
     try {
-      await navigator.clipboard.writeText(tryOnPrompt(styling.trim()));
+      await navigator.clipboard.writeText(promptFor(manualPose));
     } catch {
       // Clipboard can be blocked; the prompt is also shown below to copy by hand.
     }
@@ -134,6 +146,29 @@ export function Studio({ id, go }: { id: string; go: Go }) {
     }
     window.open(app.url, "_blank", "noopener");
     setManualNote(`Prompt copied and both photos downloaded. In ${app.label}, add them in order (1 then 2), paste, send.`);
+  };
+
+  const makeCollage = async () => {
+    const tiles = pickTiles(item.photos, collageAi);
+    if (tiles.top.length + tiles.bottom.length < 3) {
+      setError("A collage needs at least 3 photos: add the front, labels or details first.");
+      return;
+    }
+    if (!collages.length && item.photos.length >= MAX_PHOTOS) {
+      setError(`Vinted allows ${MAX_PHOTOS} photos. Remove some first.`);
+      return;
+    }
+    setError("");
+    const blob = await renderCollage(tiles);
+    const photo: Photo = {
+      id: crypto.randomUUID(),
+      kind: collageHasAi(tiles) ? "collage_ai" : "collage",
+      blob,
+      addedAt: Date.now(),
+      include: true,
+    };
+    // One collage per listing: a new one replaces the old.
+    await update((cur) => ({ ...cur, photos: [...cur.photos.filter((p) => p.kind !== "collage" && p.kind !== "collage_ai"), photo] }));
   };
 
   const importResult = async (files: FileList | null) => {
@@ -263,6 +298,35 @@ export function Studio({ id, go }: { id: string; go: Go }) {
             Styling (optional)
             <input value={styling} placeholder="e.g. jacket open, shirt tucked in" onChange={(e) => setStyling(e.target.value)} />
           </label>
+          <label className="inline">
+            <input
+              type="checkbox"
+              checked={vary}
+              onChange={(e) => {
+                setVary(e.target.checked);
+                saveVary(e.target.checked);
+              }}
+            />
+            New pose, light and spot for each listing
+          </label>
+          {vary ? (
+            <div className="looks">
+              {poses.map((pose, i) => {
+                const look = lookFor(seed, i);
+                return (
+                  <p key={pose.id} className="hint">
+                    {poses.length > 1 ? `Model photo ${i + 1}: ` : "This listing: "}
+                    {look.pose}; {look.light}; {look.spot}. Same you, same room; shoes chosen to suit the item.
+                  </p>
+                );
+              })}
+              <button className="link" disabled={!!busy} onClick={() => update((cur) => ({ ...cur, lookSeed: Math.floor(Math.random() * 2 ** 32) }))}>
+                Shuffle the look
+              </button>
+            </div>
+          ) : (
+            <p className="hint">Off: every listing keeps the exact pose, light and framing of your model photo.</p>
+          )}
           <div className="actions">
             <button disabled={!!busy} onClick={() => run(modelJobs())}>
               {`${ai.length ? "Add" : "Generate"} ${poses.length} model ${poses.length === 1 ? "photo" : "photos"} with Gemini (about ${minutes(poses.length)} min)`}
@@ -317,7 +381,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
             {manualNote && <p className="hint">{manualNote}</p>}
             <details>
               <summary className="hint">Show the prompt</summary>
-              <p className="hint prompt">{tryOnPrompt(styling.trim())}</p>
+              <p className="hint prompt">{promptFor(manualPose)}</p>
             </details>
           </details>
         </>
@@ -350,9 +414,49 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         </>
       )}
 
+      <h2>Collage</h2>
+      <p className="hint">
+        One photo showing the item, worn, and its labels and details, like many sellers' first photo. It is made on this
+        phone from your photos, cropped to fit; nothing is redrawn.
+      </p>
+      {ai.some((p) => p.include) && (
+        <label className="inline">
+          <input type="checkbox" checked={collageAi} onChange={(e) => setCollageAi(e.target.checked)} />
+          Include my approved model photo
+        </label>
+      )}
+      <div className="actions">
+        <button disabled={!!busy} onClick={() => void makeCollage()}>
+          {collages.length ? "Remake the collage" : "Make a collage"}
+        </button>
+      </div>
+      {collages.map((p) => (
+        <section key={p.id} className="collage">
+          <figure className={p.include ? "included" : ""}>
+            <Img blob={p.blob} />
+            <figcaption>
+              <label className="check">
+                <input type="checkbox" checked={!!p.include} onChange={(e) => setInclude(p.id, e.target.checked)} />
+                Add to listing
+              </label>
+              <button className="link danger" onClick={() => removePhoto(p.id)}>
+                Delete
+              </button>
+            </figcaption>
+          </figure>
+          <p className="hint">
+            {p.kind === "collage"
+              ? "Real photos only, so it goes first: your cover photo."
+              : "It contains an AI photo, so it goes second, right after your real front photo, and the description says the worn photos are AI."}
+          </p>
+        </section>
+      ))}
+
       <div className="actions">
         <button className="primary" disabled={!!busy} onClick={() => go({ name: "handoff", id })}>
-          {ai.some((p) => p.include) || improvable.some((p) => p.useImproved) ? "Ready to list" : "Skip, ready to list"}
+          {ai.some((p) => p.include) || collages.some((p) => p.include) || improvable.some((p) => p.useImproved)
+            ? "Ready to list"
+            : "Skip, ready to list"}
         </button>
       </div>
     </>
