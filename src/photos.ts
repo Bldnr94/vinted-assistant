@@ -39,26 +39,38 @@ export async function dataUriToBlob(uri: string): Promise<Blob> {
   return (await fetch(uri)).blob();
 }
 
-const rank = (p: Photo) => (p.kind === "ai_model" ? SHOT_ORDER.length : SHOT_ORDER.indexOf(p.kind));
+// Photos made by the app rather than shot: AI images and collages. They need your approval
+// (include) and are never sent to Claude for the draft.
+export const isMade = (p: Photo) => p.kind === "ai_model" || p.kind === "collage" || p.kind === "collage_ai";
 
-// Listing order: front, back, labels, defects, details, then approved AI images last.
+const rank = (p: Photo) =>
+  p.kind === "ai_model"
+    ? SHOT_ORDER.length
+    : p.kind === "collage"
+      ? -1 // real photos only: a fine cover
+      : p.kind === "collage_ai"
+        ? 0.5 // right after the real front photo, never the cover
+        : SHOT_ORDER.indexOf(p.kind);
+
+// Listing order: a real-photo collage, front, an AI collage, back, labels, defects, details,
+// then approved AI images last.
 export function orderedPhotos(photos: Photo[]): Photo[] {
   return [...photos].sort((a, b) => rank(a) - rank(b) || a.addedAt - b.addedAt);
 }
 
-export const realPhotos = (photos: Photo[]) => photos.filter((p) => p.kind !== "ai_model");
+export const realPhotos = (photos: Photo[]) => photos.filter((p) => !isMade(p));
 
 // The photo before any studio background: auto-fixed if you kept the fix, else as shot.
 export const basePhoto = (p: Photo): Blob => (p.useFixed && p.fixed ? p.fixed : p.blob);
 
-// What goes on the listing: real photos (improved where chosen), then approved AI images.
+// What goes on the listing: real photos (improved where chosen), approved collages and AI images.
 export function listingPhotos(photos: Photo[]): { photo: Photo; blob: Blob }[] {
   return orderedPhotos(photos)
-    .filter((p) => p.kind !== "ai_model" || p.include)
+    .filter((p) => !isMade(p) || p.include)
     .map((p) => ({ photo: p, blob: p.useImproved && p.improved ? p.improved : basePhoto(p) }));
 }
 
-export const hasAiImages = (photos: Photo[]) => photos.some((p) => p.kind === "ai_model" && p.include);
+export const hasAiImages = (photos: Photo[]) => photos.some((p) => (p.kind === "ai_model" || p.kind === "collage_ai") && p.include);
 
 // The description as it goes on Vinted: ends with the AI notice whenever AI images are included.
 export const listingDescription = (description: string, photos: Photo[]) =>
@@ -67,7 +79,7 @@ export const listingDescription = (description: string, photos: Photo[]) =>
 export async function toDraftImages(photos: Photo[]): Promise<DraftImage[]> {
   // Labels and defects matter most to the draft, so they go first if we hit the cap.
   const priority: ShotKind[] = ["brand_label", "size_tag", "care_label", "front", "defect", "back", "detail"];
-  const real = photos.filter((p): p is Photo & { kind: ShotKind } => p.kind !== "ai_model");
+  const real = photos.filter((p): p is Photo & { kind: ShotKind } => !isMade(p));
   const sorted = real.sort((a, b) => priority.indexOf(a.kind) - priority.indexOf(b.kind));
   return Promise.all(
     sorted.map(async (p) => ({ kind: p.kind, media_type: "image/jpeg" as const, data: await toBase64(basePhoto(p)) })),
