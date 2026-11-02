@@ -2,13 +2,25 @@
 // a Mac it redraws the background of whole-garment shots and puts the garment on your model
 // photo(s); both are free on your Google plan. Everything Gemini makes starts unticked, because
 // it redraws the whole photo: you compare it with the real one before it goes on the listing.
-// Labels and defect close-ups are never sent. On a phone the manual Gemini route still works.
+// Labels and defect close-ups are never sent. The manual route (phone, or ChatGPT) still works.
 import { useEffect, useMemo, useState } from "react";
 import { AI_NOTICE, MAX_PHOTOS } from "../shared/listing";
 import { Thumb, useItem, type Go } from "./App";
 import { listPoses, type ModelPose, type Photo } from "./db";
 import { runGeminiJob, type GeminiJob } from "./gemini";
-import { BACKDROPS, backgroundPrompt, oneLine, readBackdrop, saveBackdrop, tryOnPrompt, type BackdropId } from "./geminiPrompts";
+import {
+  BACKDROPS,
+  MANUAL_APPS,
+  backgroundPrompt,
+  oneLine,
+  readBackdrop,
+  readManualApp,
+  saveBackdrop,
+  saveManualApp,
+  tryOnPrompt,
+  type BackdropId,
+  type ManualApp,
+} from "./geminiPrompts";
 import { IMPROVABLE, basePhoto, resizeToJpeg } from "./photos";
 import "./model.css";
 
@@ -30,6 +42,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const [error, setError] = useState("");
   const [manualPose, setManualPose] = useState(0);
   const [manualNote, setManualNote] = useState("");
+  const [manualApp, setManualApp] = useState<ManualApp>(readManualApp);
   useEffect(() => {
     listPoses().then(setPoses);
   }, []);
@@ -83,8 +96,15 @@ export function Studio({ id, go }: { id: string; go: Go }) {
     saveBackdrop(b);
   };
 
-  // Manual route for a phone: hand the model photo and the garment to the Gemini app.
-  const sendToGemini = async () => {
+  const app = MANUAL_APPS.find((a) => a.id === manualApp) ?? MANUAL_APPS[0];
+  const chooseApp = (a: ManualApp) => {
+    setManualApp(a);
+    saveManualApp(a);
+    setManualNote("");
+  };
+
+  // Manual route: hand the model photo and the garment to the Gemini or ChatGPT app yourself.
+  const sendToApp = async () => {
     const pose = poses[manualPose] ?? poses[0];
     if (!pose || !garment) return;
     const files = [
@@ -99,7 +119,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
     if (navigator.canShare?.({ files })) {
       try {
         await navigator.share({ files });
-        setManualNote("Prompt copied. Pick Gemini, paste the prompt, send, then save the result and import it below.");
+        setManualNote(`Prompt copied. Pick ${app.label}, paste the prompt, send, then save the result and import it below.`);
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
@@ -112,10 +132,11 @@ export function Studio({ id, go }: { id: string; go: Go }) {
       a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }
-    setManualNote("Prompt copied and both photos downloaded. Add them in the Gemini app in order (1 then 2), paste, send.");
+    window.open(app.url, "_blank", "noopener");
+    setManualNote(`Prompt copied and both photos downloaded. In ${app.label}, add them in order (1 then 2), paste, send.`);
   };
 
-  const importFromGemini = async (files: FileList | null) => {
+  const importResult = async (files: FileList | null) => {
     if (!files?.length) return;
     if (item.photos.length + files.length > MAX_PHOTOS) {
       setError(`Vinted allows ${MAX_PHOTOS} photos. Remove some first.`);
@@ -252,8 +273,17 @@ export function Studio({ id, go }: { id: string; go: Go }) {
           </div>
 
           <details className="gemini">
-            <summary>On a phone: do it by hand in the Gemini app</summary>
-            <p className="hint">The extension only runs on a Mac. Here you hand the photos to the Gemini app yourself.</p>
+            <summary>By hand in the Gemini or ChatGPT app</summary>
+            <p className="hint">
+              The extension only runs Gemini, on a Mac. Here you hand the photos to the app yourself, on your own plan.
+            </p>
+            <div className="chips">
+              {MANUAL_APPS.map((a) => (
+                <button key={a.id} className={a.id === manualApp ? "chip on" : "chip"} onClick={() => chooseApp(a.id)}>
+                  {a.label}
+                </button>
+              ))}
+            </div>
             {poses.length > 1 && (
               <div className="pick">
                 {poses.map((p, i) => (
@@ -265,19 +295,19 @@ export function Studio({ id, go }: { id: string; go: Go }) {
             )}
             <ol className="steps">
               <li>
-                <button onClick={sendToGemini}>Send model + garment to Gemini</button>
-                <p className="hint">Copies the prompt and opens the share sheet. Choose Gemini, paste, send.</p>
+                <button onClick={sendToApp}>{`Send model + garment to ${app.label}`}</button>
+                <p className="hint">{`Copies the prompt and opens the share sheet. Choose ${app.label}, paste, send.`}</p>
               </li>
               <li>
                 <label className="button upload">
-                  Import Gemini result
+                  {`Import ${app.label} result`}
                   <input
                     type="file"
                     accept="image/*"
                     multiple
                     hidden
                     onChange={(e) => {
-                      void importFromGemini(e.target.files);
+                      void importResult(e.target.files);
                       e.target.value = "";
                     }}
                   />

@@ -12,6 +12,32 @@ export const BACKDROPS: { id: BackdropId; label: string; prompt: string }[] = [
 
 const CHOICE_KEY = "studio-backdrop";
 
+// The chat app the manual "by hand" route hands the photos to. Same prompt for both. ChatGPT is
+// manual only: OpenAI's terms forbid extracting its output automatically, so the extension
+// never drives chatgpt.com.
+export type ManualApp = "gemini" | "chatgpt";
+export const MANUAL_APPS: { id: ManualApp; label: string; url: string }[] = [
+  { id: "gemini", label: "Gemini", url: "https://gemini.google.com/app" },
+  { id: "chatgpt", label: "ChatGPT", url: "https://chatgpt.com/" },
+];
+const APP_KEY = "manual-image-app";
+
+export function readManualApp(): ManualApp {
+  try {
+    return localStorage.getItem(APP_KEY) === "chatgpt" ? "chatgpt" : "gemini";
+  } catch {
+    return "gemini";
+  }
+}
+
+export function saveManualApp(id: ManualApp) {
+  try {
+    localStorage.setItem(APP_KEY, id);
+  } catch {
+    // Falls back to Gemini next time.
+  }
+}
+
 export function readBackdrop(): BackdropId {
   try {
     const id = localStorage.getItem(CHOICE_KEY) as BackdropId | null;
