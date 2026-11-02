@@ -430,10 +430,10 @@ export function Studio({ id, go }: { id: string; go: Go }) {
         One photo showing the item, worn, and its labels and details, like many sellers' first photo. It is made on this
         phone from your photos, cropped to fit; nothing is redrawn.
       </p>
-      {ai.some((p) => p.include) && (
+      {ai.length > 0 && (
         <label className="inline">
           <input type="checkbox" checked={collageAi} onChange={(e) => setCollageAi(e.target.checked)} />
-          Include my approved model photo
+          Include my model photos (worn front and back)
         </label>
       )}
       <div className="actions">

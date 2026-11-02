@@ -44,9 +44,10 @@ publish yourself.
    all of a listing's model photos so the front and back photos match; only the pose differs, and never turns
    the body. In Settings > My model, mark each photo "Facing the mirror" or "Back to camera" (unset: the
    second photo counts as the back one); a back photo gets the item's back photo when there is one.
-   **Collage** makes one photo from the real front, an approved model photo (or the back), and the label,
-   defect and detail shots. Real photos only: it goes first as the cover. With a model photo: it goes right
-   after the real front photo, never first, and the description gets the AI notice.
+   **Collage** makes one square photo: the real front and your model photos (worn front and back) on top,
+   the label, defect, detail and back shots below; no tag on the image. Real photos only (no model photos):
+   it goes first as the cover. With model photos: it goes right after the real front photo, never first, and
+   the description gets the AI notice.
 5. **List it**: save the photos in listing order, open Vinted, then go down the field rows,
    tapping each to copy it and pasting or picking it in Vinted's form (see step 5 below). You
    press publish in Vinted.

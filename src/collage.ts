@@ -11,12 +11,15 @@ export interface Tile {
   ai: boolean;
 }
 
-const TOP = 2; // big tiles: the item, then worn
-const BOTTOM = 3; // small tiles: labels, defects, details
-const BOTTOM_ORDER: ShotKind[] = ["brand_label", "defect", "detail", "size_tag", "back", "care_label"];
+const WORN = 2; // model photos on the top row: front and back worn
+const BOTTOM = 4; // small tiles: labels, defects, details, the back
+const BOTTOM_ORDER: ShotKind[] = ["brand_label", "defect", "detail", "back", "size_tag", "care_label"];
 
-// Uses the photos as they will go on the listing (improved where you chose it), and only the
-// AI photos you approved. Without them, the second big tile is the back.
+// Top row: the real front, then your model photos (front and back worn), like Victor's reference
+// collage; without model photos, the real back. Real photos are used as they will go on the
+// listing (improved where you chose it). Model photos are used whether or not they are ticked
+// for the listing on their own: ticked ones first, then the most recent, in the order they were
+// made (your front model photo runs before the back one).
 export function pickTiles(photos: Photo[], withAi: boolean): { top: Tile[]; bottom: Tile[] } {
   const listed = listingPhotos(photos).filter(({ photo }) => photo.kind !== "collage" && photo.kind !== "collage_ai");
   const real = (kind: ShotKind) => listed.filter(({ photo }) => photo.kind === kind);
@@ -27,8 +30,14 @@ export function pickTiles(photos: Photo[], withAi: boolean): { top: Tile[]; bott
     return [{ blob: entry.blob, ai }];
   };
 
-  const worn = withAi ? listed.filter(({ photo }) => photo.kind === "ai_model") : [];
-  const top = [...take(real("front")[0]), ...(worn.length ? take(worn[0], true) : take(real("back")[0]))].slice(0, TOP);
+  const models = photos.filter((p) => p.kind === "ai_model");
+  const worn = withAi
+    ? [...models.filter((p) => p.include), ...models.filter((p) => !p.include).reverse()]
+        .slice(0, WORN)
+        .sort((a, b) => a.addedAt - b.addedAt)
+        .map((photo) => ({ photo, blob: photo.blob }))
+    : [];
+  const top = [...take(real("front")[0]), ...(worn.length ? worn.flatMap((w) => take(w, true)) : take(real("back")[0]))];
 
   const bottom: Tile[] = [];
   // One of each kind first, so three detail shots don't push out the label or a defect.
@@ -43,11 +52,11 @@ export function pickTiles(photos: Photo[], withAi: boolean): { top: Tile[]; bott
 
 export const collageHasAi = (tiles: { top: Tile[]; bottom: Tile[] }) => [...tiles.top, ...tiles.bottom].some((t) => t.ai);
 
-// Portrait 3:4 like a phone photo, so Vinted shows it whole.
-const W = 1200;
-const H = 1600;
+// Square: room for three tall tiles on top and four below.
+const W = 1500;
+const H = 1500;
 const GAP = 10;
-const MAX_CROP = 0.2; // share of a photo's width or height a tile may cut off
+const MAX_CROP = 0.3; // share of a photo's width or height a tile may cut off
 
 async function drawTile(ctx: CanvasRenderingContext2D, tile: Tile, x: number, y: number, w: number, h: number) {
   const bitmap = await createImageBitmap(tile.blob);
