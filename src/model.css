@@ -21,4 +21,4 @@ h2 em { font-style: normal; font-weight: 400; font-size: 13px; color: var(--mute
 .gemini { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 12px; }
 .gemini > summary { font-weight: 600; cursor: pointer; }
 .gemini .steps { margin: 10px 0 0; }
-.prompt { user-select: all; background: var(--card); padding: 8px 10px; border-radius: 8px; }
+.prompt { user-select: all; white-space: pre-line; background: var(--card); padding: 8px 10px; border-radius: 8px; }

@@ -36,8 +36,9 @@ publish yourself.
    "Add to listing". Model photos start from the as-shot (or auto-fixed) garment photo, never from an
    improved one, so the garment is not redrawn twice. Ticked model photos go after every real photo, and the
    description gets a line saying they are AI-generated illustrations. Labels and defect close-ups are never
-   sent. On a phone, where the extension cannot run, "On a phone: do it by hand in the Gemini app" copies the
-   prompt and shares the model photo and the garment to the Gemini app; you import the result back.
+   sent. On a phone, where the extension cannot run, or to use ChatGPT instead, "By hand in the Gemini or
+   ChatGPT app" copies the prompt and shares the model photo and the garment to the app you pick; you import
+   the result back. ChatGPT stays manual: OpenAI's terms forbid extracting its output automatically.
 5. **List it**: save the photos in listing order, open Vinted, then go down the field rows,
    tapping each to copy it and pasting or picking it in Vinted's form (see step 5 below). You
    press publish in Vinted.
