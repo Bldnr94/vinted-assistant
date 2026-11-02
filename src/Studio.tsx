@@ -8,7 +8,7 @@ import { AI_NOTICE, MAX_PHOTOS } from "../shared/listing";
 import { Thumb, useItem, type Go } from "./App";
 import { listPoses, type ModelPose, type Photo } from "./db";
 import { runGeminiJob, type GeminiJob } from "./gemini";
-import { BACKDROPS, backgroundPrompt, readBackdrop, saveBackdrop, tryOnPrompt, type BackdropId } from "./geminiPrompts";
+import { BACKDROPS, backgroundPrompt, oneLine, readBackdrop, saveBackdrop, tryOnPrompt, type BackdropId } from "./geminiPrompts";
 import { IMPROVABLE, basePhoto, resizeToJpeg } from "./photos";
 import "./model.css";
 
@@ -52,7 +52,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const backgroundJobs = (photos: Photo[]): GeminiJob[] =>
     photos.map((p) => ({ mode: "enhance", itemId: item.id, photoId: p.id, prompt: backgroundPrompt(backdrop) }));
   const modelJobs = (): GeminiJob[] =>
-    garment ? poses.map((pose) => ({ mode: "tryon", itemId: item.id, photoId: garment.id, poseId: pose.id, prompt: tryOnPrompt(styling.trim()) })) : [];
+    garment ? poses.map((pose) => ({ mode: "tryon", itemId: item.id, photoId: garment.id, poseId: pose.id, prompt: oneLine(tryOnPrompt(styling.trim())) })) : [];
 
   // Jobs run one after the other: each opens Gemini on a fresh chat in a tab of its own.
   const run = async (jobs: GeminiJob[]) => {

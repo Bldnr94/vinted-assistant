@@ -39,15 +39,50 @@ export const backgroundPrompt = (id: BackdropId) =>
   ].join(" ");
 
 // Image 1 is the model photo, image 2 the garment (the extension attaches them in that order).
+// Written on separate lines for the copy-paste route; the extension gets it through oneLine().
 export const tryOnPrompt = (styling: string) =>
-  [
-    "Image 1 is a person, image 2 is a clothing item.",
-    "Dress the person in image 1 in the clothing item from image 2.",
-    "Keep everything else in image 1 exactly as it is: the person, body, pose, the phone hiding the face, hair, the mirror, the room, the light and the framing.",
-    "Copy the clothing item exactly: same colour and shade, fabric, texture, print, logo, buttons, pockets, seams, length and cut. Do not add, remove or invent any detail.",
-    "Replace only the piece of clothing it replaces; keep the other clothes and the shoes.",
-    styling ? `Styling: ${styling}.` : "",
-    "Photo-realistic, same size and format as image 1.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  `You are a photo-realistic virtual try-on editor.
+
+INPUTS
+- Image 1: the person (the base photo).
+- Image 2: the clothing item to put on them. It is a second-hand seller's own photo: the item may be laid flat, on a hanger or worn. Use only the item itself, never the hanger, tags, hands, mannequin, bed, floor or background around it.
+
+TASK
+Dress the person in image 1 in the garment from image 2, so it looks like a real photo of them actually wearing it.
+
+1. IDENTIFY THE GARMENT
+Determine the garment's category (top, outer layer, bottom, dress, jumpsuit, etc.) and how it is meant to be worn (worn closed or open, tucked or untucked, layered over or under other pieces). Use how it appears in image 2 to decide.${
+    styling ? `\nStyling asked by the seller, which overrides your own choice: ${styling}.` : ""
+  }
+
+2. HANDLE THE EXISTING OUTFIT
+Decide what happens to each piece the person already wears:
+- Same category (e.g. new T-shirt, existing T-shirt): replace the existing piece entirely. No trace of it should remain (collar, sleeves, hem, print).
+- Layering garment (jacket, coat, cardigan, overshirt, vest): keep the existing top and show it naturally underneath (collar, neckline, hem). Adjust only where the new layer would realistically cover it.
+- Full-coverage garment (dress, jumpsuit, long coat): remove or hide the pieces it replaces or covers, and keep only what would realistically still be visible (e.g. shoes, a layer worn over it).
+- Garment that exposes more of the body (shorts, skirt, sleeveless top): render the newly exposed skin consistent with the person's visible skin tone, lighting and body shape. Do not add tattoos, marks or other details.
+- Garment that changes the silhouette (tucked vs untucked, cropped vs long, high vs low waist): adapt the neighbouring clothes so the outfit stays coherent, e.g. tuck or untuck an existing top, or let the new top cover or reveal the waistband.
+- Pieces that are not affected (the other clothes, shoes, accessories): keep them exactly as they are.
+Only change an existing piece when the new garment makes it necessary. The result must be a coherent, believable outfit, with no clipping, no doubled layers, and no pieces floating or ending abruptly.
+
+3. FIT AND PHYSICS
+- Put the garment on this person's real body, pose and proportions (shoulders, chest, waist, hips, arm and leg length), keeping its own cut: an oversized piece stays oversized, a cropped one stays cropped, a straight one stays straight. Do not make it look more fitted or more flattering than its cut allows.
+- Follow the pose: natural folds, tension, stretch and drape where the body bends, and gravity where fabric hangs.
+- Keep every seam, hem, collar and cuff aligned with the body, and make transitions between the new garment and the remaining clothes clean and realistic.
+- Respect everything in front of the garment: the phone, hands and arms stay in front and keep their exact shape and position. Hair, straps and accessories stay in their original layer order.
+
+4. EXACT GARMENT FIDELITY
+Reproduce the item from image 2 exactly: colour and shade, fabric, texture and weave, print or pattern, logo and text (position, size, spelling, and the same way round as in image 2), buttons, zips, pockets, seams, stitching, length and cut. Do not add, remove, simplify or invent any detail. Keep its real condition: any visible stain, hole, pilling, fading or wear stays visible, and do not make it look newer, brighter or freshly ironed. If part of the garment is hidden in image 2, extend it in the most plausible way consistent with its visible design, without adding new elements. Adapt only the lighting and shadows to the scene, not the garment's colour or material.
+
+5. KEEP EVERYTHING ELSE IDENTICAL
+Do not alter the person (identity, body shape, skin, pose, hair), the phone hiding the face, the mirror and its reflection logic, the room, the background, the camera angle or the framing. Do not show or add a face. The garment must also appear correctly in the mirror reflection if the reflection is visible.
+
+6. REALISM
+Match the scene's lighting direction, colour temperature, shadows, grain, sharpness and exposure. The new garment should cast and receive shadows (neck, arms, phone, folds) like the rest of the photo. Keep the casual phone-photo look of image 1: do not retouch, beautify, smooth skin or make it look like a studio or catalogue shot. No visible edges, halos, cut-out look or AI artifacts.
+
+OUTPUT
+One photo-realistic image, same size, aspect ratio and orientation as image 1, with no text, borders or watermarks added.`;
+
+// The extension types the prompt into Gemini's Quill editor, where a typed line break moves the
+// caret and scrambles the rest of the text, so automated jobs get it on a single line.
+export const oneLine = (prompt: string) => prompt.replace(/\s*\n\s*/g, " ");
