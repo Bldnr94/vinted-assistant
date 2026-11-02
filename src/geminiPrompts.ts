@@ -64,22 +64,30 @@ export const backgroundPrompt = (id: BackdropId) =>
     "Keep the same orientation, garment centred and fully visible, portrait 3:4. Photo-realistic, no text, no watermark.",
   ].join(" ");
 
-// A listing's own take on the model photo, so every listing doesn't show the exact same shot.
-// The person, the room and the mirror-selfie style stay; pose, light and spot change. Picked
-// from the listing's seed, so redoing a listing gives the same look until you shuffle it.
+// A listing's own take on the model photos, so every listing doesn't show the exact same shot.
+// The person, the room and the mirror-selfie style stay. Light, spot and shoes are shared by
+// every model photo of the listing (the front and back photos must look like one moment); only
+// the pose differs per photo, and never turns the body around.
 export interface Look {
   pose: string;
   light: string;
   spot: string;
+  shoes: string;
 }
 
+// Which way the person faces in a model photo. A back photo stays a back photo.
+export type Facing = "front" | "back";
+
+// Unset on photos added before this setting existed: the second photo is usually the back one.
+export const poseFacing = (pose: { facing?: Facing }, index: number): Facing => pose.facing ?? (index === 1 ? "back" : "front");
+
+// Poses that work facing the mirror or with the back to the camera, without turning the body.
 const POSES = [
   "standing relaxed, weight on one leg",
   "one hand on the hip",
-  "body turned a little to the side, three-quarter view",
-  "free hand lightly touching the hair",
   "free arm relaxed by the side, one knee slightly bent",
-  "mid-step, as if just turning towards the mirror",
+  "feet a little apart, shoulders relaxed",
+  "free hand lightly touching the hair",
   "free hand holding the hem or the side of the garment",
 ];
 const LIGHTS = [
@@ -92,7 +100,15 @@ const SPOTS = [
   "the same spot as image 1",
   "a step to the side, so a little more of the room shows at the edge",
   "a slightly different corner of the same room, same walls, floor and furniture style",
-  "a little closer to the mirror, still head to toe",
+  "a little closer to the camera, still head to toe",
+];
+const SHOES = [
+  "white leather trainers",
+  "black ankle boots",
+  "simple black flat sandals",
+  "beige ballet flats",
+  "black heeled mules",
+  "brown leather loafers",
 ];
 
 // Small seeded generator (mulberry32): the same seed always gives the same look.
@@ -114,11 +130,15 @@ export function seedFromId(id: string): number {
   return h >>> 0;
 }
 
-// index: which of your model photos, so two model photos in one listing don't get the same look.
+// index: which of your model photos. Light, spot and shoes come from the listing alone, so all
+// its model photos match; the pose comes from the index too, so they don't all stand the same way.
 export function lookFor(seed: number, index = 0): Look {
-  const next = random(seed + index * 7919);
-  const pick = (list: string[]) => list[Math.floor(next() * list.length)];
-  return { pose: pick(POSES), light: pick(LIGHTS), spot: pick(SPOTS) };
+  const shared = random(seed);
+  const pick = (list: string[], next: () => number) => list[Math.floor(next() * list.length)];
+  const light = pick(LIGHTS, shared);
+  const spot = pick(SPOTS, shared);
+  const shoes = pick(SHOES, shared);
+  return { pose: pick(POSES, random(seed + (index + 1) * 7919)), light, spot, shoes };
 }
 
 const VARY_KEY = "vary-look";
@@ -141,13 +161,18 @@ export function saveVary(on: boolean) {
 
 // Image 1 is the model photo, image 2 the garment (the extension attaches them in that order).
 // Written on separate lines for the copy-paste route; the extension gets it through oneLine().
-// With a look, the shot is varied (section 5) instead of kept identical to image 1.
-export const tryOnPrompt = (styling: string, look?: Look) =>
+// With a look, the shot is varied (section 5) instead of kept identical to image 1. facing: which
+// way the person faces in image 1. garmentSide: which side of the item image 2 shows.
+export const tryOnPrompt = (styling: string, look?: Look, facing: Facing = "front", garmentSide: Facing = "front") =>
   `You are a photo-realistic virtual try-on editor.
 
 INPUTS
-- Image 1: the person (the base photo).
-- Image 2: the clothing item to put on them. It is a second-hand seller's own photo: the item may be laid flat, on a hanger or worn. Use only the item itself, never the hanger, tags, hands, mannequin, bed, floor or background around it.
+- Image 1: the person (the base photo)${facing === "back" ? ", seen from behind, with their back to the camera" : ""}.
+- Image 2: the clothing item to put on them${garmentSide === "back" ? ", seen from the back" : ""}. It is a second-hand seller's own photo: the item may be laid flat, on a hanger or worn. Use only the item itself, never the hanger, tags, hands, mannequin, bed, floor or background around it.${
+    facing === "back" && garmentSide === "front"
+      ? "\nImage 2 shows the front of the item but the person faces away, so show the item's back: same fabric, colour, length and cut, and no front-only details (front print, logo, buttons, pockets) unless its design clearly runs all the way round."
+      : ""
+  }
 
 TASK
 Dress the person in image 1 in the garment from image 2, so it looks like a real photo of them actually wearing it.
@@ -181,14 +206,18 @@ Reproduce the item from image 2 exactly: colour and shade, fabric, texture and w
 ${
     look
       ? `5. SAME PERSON AND PLACE, A NEW SHOT
-This is a new photo of the same person in the same home, taken another day. Keep identical: the person (identity, body shape and proportions, skin, hair), the phone hiding the face, the room and its decor, and the casual mirror-selfie style and colour feel of image 1. Change only:
-- pose: ${look.pose};
+This is a new photo of the same person in the same home, on a different day from image 1. It is one of a pair (a front photo and a back photo of the same outfit, taken a moment apart), so the light, spot and shoes below are exactly the same in both. Keep identical: the person (identity, body shape and proportions, skin, hair), ${
+          facing === "back"
+            ? "the direction they face: their back stays to the camera, never turn them around or show their front or face"
+            : "the direction they face and the phone hiding the face"
+        }, the room and its decor, and the casual style and colour feel of image 1. Change only:
+- pose: ${look.pose}, without turning the body;
 - light: ${look.light};
 - spot: ${look.spot};
-- shoes and small accessories: chosen to suit this garment's style and season (e.g. trainers, sandals, boots or heels), unless the garment is itself shoes or an accessory, or the styling above says otherwise.
+- shoes: ${look.shoes}, unless the garment is itself shoes or the styling above says otherwise. No other new accessories.
 Do not show or add a face. The garment must look exactly as described in section 4 in this new pose.`
       : `5. KEEP EVERYTHING ELSE IDENTICAL
-Do not alter the person (identity, body shape, skin, pose, hair), the phone hiding the face, the mirror and its reflection logic, the room, the background, the camera angle or the framing. Do not show or add a face. The garment must also appear correctly in the mirror reflection if the reflection is visible.`
+Do not alter the person (identity, body shape, skin, pose, hair, the direction they face), the phone hiding the face if any, the mirror and its reflection logic, the room, the background, the camera angle or the framing. Do not show or add a face. The garment must also appear correctly in the mirror reflection if the reflection is visible.`
   }
 
 6. REALISM

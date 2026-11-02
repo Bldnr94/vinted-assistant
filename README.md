@@ -40,7 +40,10 @@ publish yourself.
    ChatGPT app" copies the prompt and shares the model photo and the garment to the app you pick; you import
    the result back. ChatGPT stays manual: OpenAI's terms forbid extracting its output automatically.
    Each listing gets its own pose, light and spot in the same room (picked from the listing, "Shuffle the
-   look" for another; turn it off to keep your model photo's exact shot), and shoes chosen to suit the item.
+   look" for another; turn it off to keep your model photo's exact shot). Light, spot and shoes are shared by
+   all of a listing's model photos so the front and back photos match; only the pose differs, and never turns
+   the body. In Settings > My model, mark each photo "Facing the mirror" or "Back to camera" (unset: the
+   second photo counts as the back one); a back photo gets the item's back photo when there is one.
    **Collage** makes one photo from the real front, an approved model photo (or the back), and the label,
    defect and detail shots. Real photos only: it goes first as the cover. With a model photo: it goes right
    after the real front photo, never first, and the description gets the AI notice.

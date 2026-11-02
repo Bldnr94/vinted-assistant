@@ -12,6 +12,7 @@ import {
   BACKDROPS,
   MANUAL_APPS,
   lookFor,
+  poseFacing,
   backgroundPrompt,
   oneLine,
   readBackdrop,
@@ -63,7 +64,13 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   // Each listing gets its own pose, light and spot (one per model photo) unless you turn it off.
   const seed = item.lookSeed ?? seedFromId(item.id);
   const lookAt = (i: number) => (vary ? lookFor(seed, i) : undefined);
-  const promptFor = (i: number) => tryOnPrompt(styling.trim(), lookAt(i));
+  // A model photo with your back to the camera gets the item's back photo when there is one.
+  const backShot = improvable.find((p) => p.kind === "back");
+  const garmentFor = (i: number) => (poseFacing(poses[i], i) === "back" && backShot ? backShot : garment);
+  const promptFor = (i: number) => {
+    const g = garmentFor(i);
+    return tryOnPrompt(styling.trim(), lookAt(i), poseFacing(poses[i], i), g?.kind === "back" ? "back" : "front");
+  };
   // The garment shown on the model: the front shot by default, as shot (never an earlier Gemini
   // version, so the garment is not redrawn twice).
   const garment = improvable.find((p) => p.id === garmentId) ?? improvable.find((p) => p.kind === "front") ?? improvable[0];
@@ -77,7 +84,7 @@ export function Studio({ id, go }: { id: string; go: Go }) {
   const backgroundJobs = (photos: Photo[]): GeminiJob[] =>
     photos.map((p) => ({ mode: "enhance", itemId: item.id, photoId: p.id, prompt: backgroundPrompt(backdrop) }));
   const modelJobs = (): GeminiJob[] =>
-    garment ? poses.map((pose, i) => ({ mode: "tryon", itemId: item.id, photoId: garment.id, poseId: pose.id, prompt: oneLine(promptFor(i)) })) : [];
+    garment ? poses.map((pose, i) => ({ mode: "tryon", itemId: item.id, photoId: garmentFor(i)!.id, poseId: pose.id, prompt: oneLine(promptFor(i)) })) : [];
 
   // Jobs run one after the other: each opens Gemini on a fresh chat in a tab of its own.
   const run = async (jobs: GeminiJob[]) => {
@@ -117,14 +124,16 @@ export function Studio({ id, go }: { id: string; go: Go }) {
 
   // Manual route: hand the model photo and the garment to the Gemini or ChatGPT app yourself.
   const sendToApp = async () => {
-    const pose = poses[manualPose] ?? poses[0];
-    if (!pose || !garment) return;
+    const i = poses[manualPose] ? manualPose : 0;
+    const pose = poses[i];
+    const g = garmentFor(i);
+    if (!pose || !g) return;
     const files = [
       new File([pose.blob], "1-modele.jpg", { type: "image/jpeg" }),
-      new File([basePhoto(garment)], "2-vetement.jpg", { type: "image/jpeg" }),
+      new File([basePhoto(g)], "2-vetement.jpg", { type: "image/jpeg" }),
     ];
     try {
-      await navigator.clipboard.writeText(promptFor(manualPose));
+      await navigator.clipboard.writeText(promptFor(i));
     } catch {
       // Clipboard can be blocked; the prompt is also shown below to copy by hand.
     }
@@ -311,15 +320,17 @@ export function Studio({ id, go }: { id: string; go: Go }) {
           </label>
           {vary ? (
             <div className="looks">
-              {poses.map((pose, i) => {
-                const look = lookFor(seed, i);
-                return (
-                  <p key={pose.id} className="hint">
-                    {poses.length > 1 ? `Model photo ${i + 1}: ` : "This listing: "}
-                    {look.pose}; {look.light}; {look.spot}. Same you, same room; shoes chosen to suit the item.
-                  </p>
-                );
-              })}
+              <p className="hint">
+                This listing: {lookFor(seed).light}; {lookFor(seed).spot}; {lookFor(seed).shoes}. The same for every model
+                photo, so front and back match.
+              </p>
+              {poses.map((pose, i) => (
+                <p key={pose.id} className="hint">
+                  {`Model photo ${i + 1} (${poseFacing(pose, i) === "back" ? "back to camera" : "facing the mirror"}${
+                    poseFacing(pose, i) === "back" ? (backShot ? ", with the item's back photo" : ", no back photo of the item yet") : ""
+                  }): ${lookFor(seed, i).pose}.`}
+                </p>
+              ))}
               <button className="link" disabled={!!busy} onClick={() => update((cur) => ({ ...cur, lookSeed: Math.floor(Math.random() * 2 ** 32) }))}>
                 Shuffle the look
               </button>

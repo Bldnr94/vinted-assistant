@@ -72,7 +72,7 @@ export function buildEntries(rows: Rows, settings: Record<string, string>, now =
   }));
   const poses: ManifestPose[] = rows.poses
     .filter((p) => p.blob instanceof Blob)
-    .map((p) => ({ id: p.id, createdAt: p.createdAt, prompt: p.prompt, blob: add(`poses/${p.id}`, p.blob) }));
+    .map((p) => ({ id: p.id, createdAt: p.createdAt, prompt: p.prompt, facing: p.facing, blob: add(`poses/${p.id}`, p.blob) }));
 
   const manifest: Manifest = {
     app: "vinted-assistant",
@@ -179,7 +179,13 @@ export async function parseBackup(file: Blob): Promise<ParsedBackup> {
     items.push(stripLegacyPhotoFields({ ...mi, photos }));
   }
   const poses: ModelPose[] = [];
-  for (const mp of manifest.poses) poses.push({ id: mp.id, createdAt: mp.createdAt, prompt: mp.prompt, blob: await get(mp.blob) });
+  for (const mp of manifest.poses) poses.push({
+      id: mp.id,
+      createdAt: mp.createdAt,
+      prompt: mp.prompt,
+      ...(mp.facing === "back" || mp.facing === "front" ? { facing: mp.facing } : {}),
+      blob: await get(mp.blob),
+    });
 
   return { exportedAt: manifest.exportedAt, items, sales: manifest.sales, poses, settings: manifest.settings, fileSize: file.size };
 }

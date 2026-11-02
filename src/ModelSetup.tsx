@@ -3,6 +3,7 @@
 // looks like a private seller's own shot at home; no face in frame is a good idea.
 import { useEffect, useMemo, useState } from "react";
 import { deletePose, listPoses, savePose, type ModelPose } from "./db";
+import { poseFacing, type Facing } from "./geminiPrompts";
 import { resizeToJpeg } from "./photos";
 import "./model.css";
 
@@ -48,7 +49,8 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
         <h1>My model</h1>
       </header>
       <p className="hint">
-        Add one to {MAX_POSES} photos of yourself or a model, once. In the Photos step Gemini puts each garment on these same
+        Add one to {MAX_POSES} photos of yourself or a model, once. Mark each one as facing the mirror or with your back
+        to the camera: a back photo stays a back photo and gets the item's back photo. In the Photos step Gemini puts each garment on these same
         photos, one model photo per photo here, so every listing shows the same body, pose and room, like a seller's own photo
         at home.
       </p>
@@ -58,6 +60,20 @@ export function ModelSetup({ onBack }: { onBack: () => void }) {
           {poses.map((p, i) => (
             <figure key={p.id}>
               <PoseImage blob={p.blob} />
+              <div className="chips">
+                {(["front", "back"] as Facing[]).map((f) => (
+                  <button
+                    key={f}
+                    className={poseFacing(p, i) === f ? "chip on" : "chip"}
+                    onClick={async () => {
+                      await savePose({ ...p, facing: f });
+                      await reload();
+                    }}
+                  >
+                    {f === "front" ? "Facing the mirror" : "Back to camera"}
+                  </button>
+                ))}
+              </div>
               <figcaption>
                 Photo {i + 1}
                 <button
